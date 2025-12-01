@@ -5,7 +5,7 @@ import { ResourceType, Status, ChaosType, InfrastructureNode } from '../types';
 // It mimics a real cloud environment by fluctuating metrics and generating telemetry.
 
 class SimulationService {
-  private intervalId: NodeJS.Timeout | null = null;
+  private intervalId: any = null;
   private isRunning = false;
 
   start() {

@@ -8,26 +8,41 @@ function cn(...inputs: ClassValue[]) {
 
 interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
-  variant?: 'default' | 'glass' | 'outline' | 'filled';
+  variant?: 'default' | 'glass' | 'outline' | 'filled' | 'neon';
+  hoverEffect?: boolean;
 }
 
 export const Card: React.FC<CardProps> = ({ 
   children, 
   className, 
-  variant = 'glass',
+  variant = 'default',
+  hoverEffect = false,
   ...props 
 }) => {
-  const baseStyles = "rounded-xl p-5 transition-all duration-200 relative overflow-hidden";
+  const baseStyles = "rounded-3xl p-6 transition-all duration-300 relative overflow-hidden";
+  
   const variants = {
-    default: "bg-surface border border-slate-700 shadow-md",
-    glass: "glass-panel shadow-xl shadow-black/20 hover:border-slate-600/50",
-    outline: "border border-slate-700 bg-transparent hover:bg-slate-800/30",
-    filled: "bg-slate-800/80 border border-slate-700/50"
+    default: "bg-card border border-white/5 shadow-2xl shadow-black/40",
+    glass: "glass-panel shadow-xl shadow-black/20",
+    outline: "border border-white/10 bg-transparent",
+    filled: "bg-[#13131A] border border-white/5",
+    neon: "bg-gradient-to-br from-[#1A1A24] to-[#13131A] border border-white/10 shadow-neon"
   };
 
+  const hoverStyles = hoverEffect 
+    ? "hover:border-white/10 hover:shadow-glow hover:-translate-y-1 hover:bg-[#1A1A23]" 
+    : "";
+
   return (
-    <div className={cn(baseStyles, variants[variant], className)} {...props}>
-      {children}
+    <div className={cn(baseStyles, variants[variant], hoverStyles, className)} {...props}>
+      {/* Subtle top gradient line for 3D effect */}
+      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-white/10 to-transparent opacity-50" />
+      {/* Subtle radial gradient background for depth */}
+      <div className="absolute -top-24 -right-24 w-48 h-48 bg-white/5 rounded-full blur-3xl pointer-events-none" />
+      
+      <div className="relative z-10">
+        {children}
+      </div>
     </div>
   );
 };

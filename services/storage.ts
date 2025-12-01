@@ -1,9 +1,9 @@
 import { InfrastructureNode, LogEntry, PipelineRun, Vulnerability, DoraMetrics, TerraformWorkspace } from '../types';
 import { MOCK_NODES, MOCK_LOGS, MOCK_PIPELINES, MOCK_VULNERABILITIES, MOCK_TF_WORKSPACES } from '../constants';
+import { supabase } from '../lib/supabase';
 
-// This Service simulates a Backend (Supabase/Firebase abstraction layer).
-// It implements the "Repository Pattern" to decouple UI from data source.
-
+// CONSTANTS
+const USE_CLOUD = !!process.env.REACT_APP_USE_CLOUD_DB;
 const STORAGE_KEYS = {
   NODES: 'opssight_nodes',
   LOGS: 'opssight_logs',
@@ -11,7 +11,7 @@ const STORAGE_KEYS = {
   VULNS: 'opssight_vulns',
   METRICS_DORA: 'opssight_dora',
   TF_WORKSPACES: 'opssight_tf_workspaces',
-  INIT: 'opssight_initialized_v2'
+  INIT: 'opssight_initialized_v3'
 };
 
 class StorageService {
@@ -19,8 +19,8 @@ class StorageService {
     this.initialize();
   }
 
-  private initialize() {
-    // Reset or init mock data
+  private async initialize() {
+    // Local Init for Plug and Play experience
     if (typeof window !== 'undefined' && !localStorage.getItem(STORAGE_KEYS.INIT)) {
       this.saveNodes(MOCK_NODES);
       this.saveLogs(MOCK_LOGS);
@@ -74,12 +74,25 @@ class StorageService {
     localStorage.setItem(STORAGE_KEYS.LOGS, JSON.stringify(logs));
   }
 
-  addLog(log: LogEntry) {
+  async addLog(log: LogEntry) {
+    // Local Update
     const logs = this.getLogs();
     logs.unshift(log);
     // Keep ring buffer of last 200 logs to prevent storage quota issues
     if (logs.length > 200) logs.pop(); 
     this.saveLogs(logs);
+
+    // Cloud Update (Fire & Forget for performance in UI)
+    if (USE_CLOUD && supabase) {
+      await supabase.from('logs').insert({
+        level: log.level,
+        source: log.source,
+        message: log.message,
+        trace_id: log.traceId
+      }).then(({ error }) => {
+        if (error) console.warn("Failed to sync log to cloud:", error.message);
+      });
+    }
   }
 
   // --- Pipelines ---
@@ -98,6 +111,12 @@ class StorageService {
   getTerraformWorkspaces(): TerraformWorkspace[] {
     const data = localStorage.getItem(STORAGE_KEYS.TF_WORKSPACES);
     return data ? JSON.parse(data) : MOCK_TF_WORKSPACES;
+  }
+
+  addTerraformWorkspace(workspace: TerraformWorkspace) {
+    const workspaces = this.getTerraformWorkspaces();
+    workspaces.push(workspace);
+    localStorage.setItem(STORAGE_KEYS.TF_WORKSPACES, JSON.stringify(workspaces));
   }
 
   updateTerraformWorkspace(id: string, updates: Partial<TerraformWorkspace>) {
