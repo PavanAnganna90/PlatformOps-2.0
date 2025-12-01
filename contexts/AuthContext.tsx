@@ -24,49 +24,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isDemoMode, setIsDemoMode] = useState(!hasCloudConfig);
 
   useEffect(() => {
-    // Initial check
-    checkUser();
+    let mounted = true;
 
-    // Listen for Auth changes (redirects, signouts, etc.)
-    const { data: listener } = supabase?.auth.onAuthStateChange(async (event, session) => {
-      console.log(`[Auth] AuthStateChange: ${event}`, session?.user?.email);
-      
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
-        // If we have a session, ensure we have the full user profile
-        if (session?.user) {
-          await checkUser(); 
-        } else {
-          setLoading(false);
-        }
-      } else if (event === 'SIGNED_OUT') {
-        setUser(null);
-        setLoading(false);
+    const initAuth = async () => {
+      try {
+        await checkUser();
+      } catch (error) {
+        console.error("[Auth] Initialization error:", error);
+      } finally {
+        if (mounted) setLoading(false);
       }
-    }) || { data: { subscription: { unsubscribe: () => {} } } };
+    };
+
+    initAuth();
+
+    // Listen for Auth changes safely
+    let subscription: { unsubscribe: () => void } | null = null;
+
+    if (supabase) {
+      const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+        console.log(`[Auth] AuthStateChange: ${event}`, session?.user?.email);
+        
+        if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+          if (session?.user && mounted) {
+            await checkUser(); 
+          }
+        } else if (event === 'SIGNED_OUT') {
+          if (mounted) setUser(null);
+        }
+      });
+      subscription = data.subscription;
+    }
 
     return () => {
-      listener.subscription.unsubscribe();
+      mounted = false;
+      subscription?.unsubscribe();
     };
   }, []);
 
   const checkUser = async () => {
     try {
       if (!isDemoMode && hasCloudConfig) {
-        console.log("[Auth] Checking current user session...");
         const u = await authService.getCurrentUser();
         if (u) {
-          console.log("[Auth] User found:", u.email);
           setUser(u);
         } else {
-          console.log("[Auth] No user session found.");
           setUser(null);
         }
       }
     } catch (error) {
       console.error("[Auth] Check failed:", error);
       setUser(null);
-    } finally {
-      setLoading(false);
     }
   };
 
@@ -82,13 +90,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await authService.signOut();
     setUser(null);
     if (!hasCloudConfig) {
-      setIsDemoMode(true); // Fallback to demo if no config
+      setIsDemoMode(true);
     }
   };
 
   const enableDemoMode = () => {
     setIsDemoMode(true);
-    // Auto-login mock user for instant gratification
     setUser({
       id: 'demo',
       name: 'Demo Engineer', 
