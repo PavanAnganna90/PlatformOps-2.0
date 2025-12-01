@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card } from '../ui/Card';
 import { Box, Mail, Chrome, ArrowRight, ShieldCheck, Terminal, Cpu, PlayCircle } from 'lucide-react';

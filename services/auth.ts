@@ -1,3 +1,4 @@
+
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
 
@@ -8,7 +9,7 @@ export const authService = {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return null;
       
-      // Try to fetch profile details, handle error gracefully if profile table doesn't exist yet
+      // Try to fetch profile details
       const { data: profile } = await supabase
         .from('profiles')
         .select('*')
