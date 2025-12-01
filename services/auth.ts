@@ -4,16 +4,27 @@ import { UserProfile } from '../types';
 export const authService = {
   
   async getCurrentUser(): Promise<UserProfile | null> {
-    if (supabase) {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return null;
+    if (!supabase) return null;
+
+    try {
+      const { data: { user }, error } = await supabase.auth.getUser();
+      if (error || !user) {
+        if (error) console.debug("[Auth] getUser error:", error.message);
+        return null;
+      }
       
-      // Try to fetch profile details
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .maybeSingle();
+      // Try to fetch profile details, but don't fail if table is missing
+      let profile = null;
+      try {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*')
+          .eq('id', user.id)
+          .maybeSingle();
+        profile = data;
+      } catch (err) {
+        console.warn("[Auth] Profile fetch failed (ignoring):", err);
+      }
         
       return {
         id: user.id,
@@ -23,16 +34,16 @@ export const authService = {
         role: profile?.role || 'viewer',
         preferences: { theme: 'dark', refreshRate: 5000 }
       };
+    } catch (e) {
+      console.error("[Auth] Unexpected error in getCurrentUser:", e);
+      return null;
     }
-    
-    return null; 
   },
 
   async signInWithEmail(email: string) {
     if (!supabase) throw new Error("Supabase not configured");
     
     // Dynamically redirect back to the current domain/port
-    // ensure no trailing slash, though origin usually doesn't have one
     const redirectTo = window.location.origin;
 
     console.log(`[Auth] Sending Magic Link with redirect URL: ${redirectTo}`);

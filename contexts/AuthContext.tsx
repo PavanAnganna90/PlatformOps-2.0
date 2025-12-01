@@ -20,15 +20,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   
   // Check environment for Cloud Config
-  // Modified to check if Supabase is actually configured (via env OR defaults)
   const hasCloudConfig = isSupabaseConfigured();
   const [isDemoMode, setIsDemoMode] = useState(!hasCloudConfig);
 
   useEffect(() => {
+    // Initial check
     checkUser();
 
-    const { data: listener } = supabase?.auth.onAuthStateChange((_event, session) => {
-      checkUser();
+    // Listen for Auth changes (redirects, signouts, etc.)
+    const { data: listener } = supabase?.auth.onAuthStateChange(async (event, session) => {
+      console.log(`[Auth] AuthStateChange: ${event}`, session?.user?.email);
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
+        // If we have a session, ensure we have the full user profile
+        if (session?.user) {
+          await checkUser(); 
+        } else {
+          setLoading(false);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setUser(null);
+        setLoading(false);
+      }
     }) || { data: { subscription: { unsubscribe: () => {} } } };
 
     return () => {
@@ -38,12 +51,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const checkUser = async () => {
     try {
-      if (!isDemoMode) {
+      if (!isDemoMode && hasCloudConfig) {
+        console.log("[Auth] Checking current user session...");
         const u = await authService.getCurrentUser();
-        setUser(u);
+        if (u) {
+          console.log("[Auth] User found:", u.email);
+          setUser(u);
+        } else {
+          console.log("[Auth] No user session found.");
+          setUser(null);
+        }
       }
     } catch (error) {
-      console.error("Auth check failed", error);
+      console.error("[Auth] Check failed:", error);
+      setUser(null);
     } finally {
       setLoading(false);
     }

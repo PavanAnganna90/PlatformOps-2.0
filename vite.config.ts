@@ -3,15 +3,19 @@ import react from '@vitejs/plugin-react';
 
 export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
-  // We cast process to any to avoid TS errors in the config file context
   const env = loadEnv(mode, (process as any).cwd(), '');
 
   return {
     plugins: [react()],
     define: {
-      // Polyfill process.env for compatibility with existing code
-      // We explicitly define process.env so accessing properties on it works in the browser
-      'process.env': JSON.stringify(env)
+      // Safely expose environment variables to the client
+      // We only expose standard React/Supabase env vars to prevent leaking secrets
+      'process.env': {
+        NODE_ENV: JSON.stringify(mode),
+        REACT_APP_SUPABASE_URL: JSON.stringify(env.REACT_APP_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || env.VITE_SUPABASE_URL),
+        REACT_APP_SUPABASE_ANON_KEY: JSON.stringify(env.REACT_APP_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY),
+        API_KEY: JSON.stringify(env.API_KEY || env.VITE_API_KEY)
+      }
     }
   };
 });
