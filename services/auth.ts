@@ -1,4 +1,3 @@
-
 import { supabase } from '../lib/supabase';
 import { UserProfile } from '../types';
 
@@ -31,14 +30,35 @@ export const authService = {
 
   async signInWithEmail(email: string) {
     if (!supabase) throw new Error("Supabase not configured");
-    const { error } = await supabase.auth.signInWithOtp({ email });
+    
+    // Dynamically redirect back to the current domain/port
+    // ensure no trailing slash, though origin usually doesn't have one
+    const redirectTo = window.location.origin;
+
+    console.log(`[Auth] Sending Magic Link with redirect URL: ${redirectTo}`);
+
+    const { error } = await supabase.auth.signInWithOtp({ 
+      email,
+      options: {
+        emailRedirectTo: redirectTo
+      }
+    });
     if (error) throw error;
     return true;
   },
 
   async signInWithGoogle() {
     if (!supabase) throw new Error("Supabase not configured");
-    const { error } = await supabase.auth.signInWithOAuth({ provider: 'google' });
+    
+    const redirectTo = window.location.origin;
+    console.log(`[Auth] Initiating Google OAuth with redirect URL: ${redirectTo}`);
+
+    const { error } = await supabase.auth.signInWithOAuth({ 
+      provider: 'google',
+      options: {
+        redirectTo
+      }
+    });
     if (error) throw error;
   },
 

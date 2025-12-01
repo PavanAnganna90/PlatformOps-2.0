@@ -4,101 +4,26 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OpsSight - DevOps Visibility</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script>
-      tailwind.config = {
-        darkMode: 'class',
-        theme: {
-          extend: {
-            colors: {
-              background: '#050505', // Deep Obsidian
-              surface: '#0F1115',    // Charcoal
-              card: '#13131A',       // Slightly lighter charcoal for cards
-              primary: '#6366f1',    // Indigo-500 (Neon Purple-ish)
-              secondary: '#64748b',  // Slate-500
-              success: '#10b981',    // Emerald-500
-              warning: '#f59e0b',    // Amber-500
-              error: '#ef4444',      // Red-500
-              accent: '#8b5cf6',     // Violet-500
-              'neon-blue': '#3b82f6',
-              'neon-purple': '#8b5cf6',
-              'neon-green': '#10b981',
-            },
-            fontFamily: {
-              mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'Courier New', 'monospace'],
-              sans: ['Inter', 'system-ui', 'sans-serif'],
-            },
-            backgroundImage: {
-              'gradient-radial': 'radial-gradient(var(--tw-gradient-stops))',
-              'neon-glow': 'conic-gradient(from 180deg at 50% 50%, #2a8af6 0deg, #a853ba 180deg, #e92a67 360deg)',
-            },
-            boxShadow: {
-              'neon': '0 0 20px -5px rgba(139, 92, 246, 0.15)',
-              'glow': '0 0 40px -10px rgba(59, 130, 246, 0.3)',
-            }
-          }
-        }
-      }
-    </script>
-    <style>
-      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
-      
-      body {
-        background-color: #050505;
-        color: #e2e8f0;
-        font-family: 'Inter', sans-serif;
-      }
-      /* Custom Scrollbar for Terminal feel */
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: #050505;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #1e293b;
-        border-radius: 9999px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #334155;
-      }
-      .glass-panel {
-        background: rgba(19, 19, 26, 0.6);
-        backdrop-filter: blur(16px);
-        -webkit-backdrop-filter: blur(16px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-      }
-      .neon-border-top {
-        position: relative;
-      }
-      .neon-border-top::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: 0;
-        right: 0;
-        height: 1px;
-        background: linear-gradient(90deg, transparent, rgba(139, 92, 246, 0.5), transparent);
-      }
-    </style>
   <script type="importmap">
 {
   "imports": {
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.0",
     "recharts": "https://aistudiocdn.com/recharts@^3.5.1",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.30.0",
+    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.1",
     "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/",
+    "vite": "https://aistudiocdn.com/vite@^7.2.6",
     "react/": "https://aistudiocdn.com/react@^19.2.0/",
     "react": "https://aistudiocdn.com/react@^19.2.0",
     "lucide-react": "https://aistudiocdn.com/lucide-react@^0.555.0",
     "clsx": "https://aistudiocdn.com/clsx@^2.1.1",
-    "tailwind-merge": "https://aistudiocdn.com/tailwind-merge@^3.4.0",
-    "@supabase/supabase-js": "https://aistudiocdn.com/@supabase/supabase-js@^2.86.0"
+    "tailwind-merge": "https://aistudiocdn.com/tailwind-merge@^3.4.0"
   }
 }
 </script>
 </head>
   <body>
     <div id="root"></div>
+    <script type="module" src="/index.tsx"></script>
   </body>
 </html>

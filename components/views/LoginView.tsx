@@ -1,14 +1,37 @@
-
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '../ui/Card';
-import { Box, Mail, Chrome, ArrowRight, ShieldCheck, Terminal, Cpu, PlayCircle } from 'lucide-react';
+import { Box, Mail, Chrome, ArrowRight, ShieldCheck, Terminal, Cpu, PlayCircle, Wifi, WifiOff, Loader2, Info } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { testConnection } from '../../lib/supabase';
 
 export const LoginView: React.FC = () => {
   const { loginWithEmail, loginWithGoogle, enableDemoMode } = useAuth();
   const [email, setEmail] = useState('');
   const [sent, setSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  
+  // Connection State
+  const [connectionStatus, setConnectionStatus] = useState<'checking' | 'connected' | 'error'>('checking');
+  const [connectionMsg, setConnectionMsg] = useState('');
+
+  // Debug State
+  const [currentOrigin, setCurrentOrigin] = useState('');
+
+  useEffect(() => {
+    setCurrentOrigin(window.location.origin);
+    
+    const check = async () => {
+      const result = await testConnection();
+      if (result.success) {
+        setConnectionStatus('connected');
+        setConnectionMsg('Systems Online');
+      } else {
+        setConnectionStatus('error');
+        setConnectionMsg(result.message);
+      }
+    };
+    check();
+  }, []);
 
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,6 +84,18 @@ export const LoginView: React.FC = () => {
 
         {/* Right Side: Login Form */}
         <Card className="w-full max-w-md mx-auto bg-[#0F1115]/80 backdrop-blur-xl border-white/10 shadow-2xl relative">
+          
+          {/* Connection Status Badge */}
+          <div className={`absolute top-4 right-4 px-2 py-1 rounded-full text-[10px] font-medium border flex items-center gap-1.5 transition-colors
+            ${connectionStatus === 'connected' ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-500' : 
+              connectionStatus === 'error' ? 'bg-red-500/10 border-red-500/20 text-red-500' : 'bg-slate-800 border-slate-700 text-slate-400'}
+          `}>
+            {connectionStatus === 'checking' && <Loader2 size={10} className="animate-spin"/>}
+            {connectionStatus === 'connected' && <Wifi size={10} />}
+            {connectionStatus === 'error' && <WifiOff size={10} />}
+            {connectionStatus === 'checking' ? 'Connecting...' : connectionMsg}
+          </div>
+
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-white">Welcome to OpsSight</h2>
             <p className="text-sm text-slate-400 mt-2">Sign in to access your production dashboard</p>
@@ -73,6 +108,13 @@ export const LoginView: React.FC = () => {
                </div>
                <h3 className="text-white font-semibold">Check your email</h3>
                <p className="text-slate-400 text-sm mt-2">We sent a magic link to {email}</p>
+               <div className="mt-4 p-3 bg-slate-800/50 rounded-lg text-xs text-slate-400 text-left border border-slate-700/50">
+                  <p className="font-semibold text-slate-300 mb-1 flex items-center gap-2">
+                    <Info size={12} className="text-primary"/> Tip: Redirect Issues?
+                  </p>
+                  <p>The link will attempt to redirect to: <br/><span className="font-mono text-primary bg-primary/10 px-1 rounded">{currentOrigin}</span></p>
+                  <p className="mt-2 opacity-70">If it goes to localhost instead, add this URL to your Supabase Dashboard &gt; Auth &gt; URL Configuration.</p>
+               </div>
                <button onClick={() => setSent(false)} className="mt-6 text-primary text-sm hover:underline">Try another email</button>
              </div>
           ) : (
@@ -94,8 +136,8 @@ export const LoginView: React.FC = () => {
                 </div>
                 <button 
                   type="submit" 
-                  disabled={loading}
-                  className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center gap-2"
+                  disabled={loading || connectionStatus === 'error'}
+                  className="w-full py-3 bg-white text-black font-bold rounded-xl hover:bg-slate-200 transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {loading ? 'Sending...' : 'Sign in with Email'} <ArrowRight size={16} />
                 </button>
@@ -109,7 +151,8 @@ export const LoginView: React.FC = () => {
               <div className="grid grid-cols-2 gap-3 mb-6">
                 <button 
                   onClick={() => loginWithGoogle()}
-                  className="py-2.5 px-4 bg-[#050505] border border-slate-800 rounded-xl text-slate-300 hover:text-white hover:border-slate-600 transition-all flex items-center justify-center gap-2 text-sm font-medium"
+                  disabled={connectionStatus === 'error'}
+                  className="py-2.5 px-4 bg-[#050505] border border-slate-800 rounded-xl text-slate-300 hover:text-white hover:border-slate-600 transition-all flex items-center justify-center gap-2 text-sm font-medium disabled:opacity-50"
                 >
                   <Chrome size={18} /> Google
                 </button>
@@ -133,6 +176,11 @@ export const LoginView: React.FC = () => {
                 <p className="text-center text-[10px] text-slate-500 mt-2">
                   No account required. Runs in browser memory.
                 </p>
+                <div className="mt-4 text-center">
+                  <p className="text-[10px] text-slate-600 font-mono">
+                     Detected Origin: <span className="text-slate-500">{currentOrigin}</span>
+                  </p>
+                </div>
               </div>
             </>
           )}

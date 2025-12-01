@@ -1,11 +1,11 @@
-
 import { InfrastructureNode, LogEntry, PipelineRun, Vulnerability, DoraMetrics, TerraformWorkspace } from '../types';
 import { MOCK_NODES, MOCK_LOGS, MOCK_PIPELINES, MOCK_VULNERABILITIES, MOCK_TF_WORKSPACES } from '../constants';
 import { supabase } from '../lib/supabase';
 
 // CONSTANTS
 // Check if Cloud Mode is enabled via ENV or implicit presence of keys
-const USE_CLOUD = process.env.REACT_APP_USE_CLOUD_DB === 'true' && !!supabase;
+// We enable cloud sync if Supabase is available for testing purposes
+const USE_CLOUD = !!supabase;
 
 const STORAGE_KEYS = {
   NODES: 'opssight_nodes',

@@ -1,8 +1,7 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { UserProfile } from '../types';
 import { authService } from '../services/auth';
-import { supabase } from '../lib/supabase';
+import { supabase, isSupabaseConfigured } from '../lib/supabase';
 
 interface AuthContextType {
   user: UserProfile | null;
@@ -21,7 +20,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   
   // Check environment for Cloud Config
-  const hasCloudConfig = !!process.env.REACT_APP_SUPABASE_URL;
+  // Modified to check if Supabase is actually configured (via env OR defaults)
+  const hasCloudConfig = isSupabaseConfigured();
   const [isDemoMode, setIsDemoMode] = useState(!hasCloudConfig);
 
   useEffect(() => {
