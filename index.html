@@ -10,7 +10,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     
-    <!-- Tailwind CSS (Runtime fallback for safety) -->
+    <!-- Tailwind CSS (Runtime fallback ensures styles load even if build css fails) -->
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
       tailwind.config = {
@@ -49,13 +49,12 @@
     </script>
 
     <style>
-      /* Ensure base styles that Tailwind might miss in CDN mode */
       body {
         background-color: #050505;
         color: #e2e8f0;
       }
     </style>
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
     "react": "https://aistudiocdn.com/react@^19.2.0",

@@ -43,7 +43,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     if (supabase) {
       const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-        console.log(`[Auth] AuthStateChange: ${event}`, session?.user?.email);
+        console.log(`[Auth] AuthStateChange: ${event}`);
         
         if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED' || event === 'INITIAL_SESSION') {
           if (session?.user && mounted) {
@@ -58,7 +58,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     return () => {
       mounted = false;
-      subscription?.unsubscribe();
+      if (subscription && typeof subscription.unsubscribe === 'function') {
+        subscription.unsubscribe();
+      }
     };
   }, []);
 
