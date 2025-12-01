@@ -3,11 +3,13 @@ import { createClient } from '@supabase/supabase-js';
 // Helper to get env vars regardless of the build tool (Vite, CRA, Next.js)
 const getEnv = (key: string) => {
   // 1. Try Import Meta (Vite standard)
-  if (typeof import.meta !== 'undefined' && import.meta.env) {
+  // Cast import.meta to any to avoid TS errors about 'env' missing on ImportMeta
+  const meta = import.meta as any;
+  if (typeof meta !== 'undefined' && meta.env) {
     // Check for VITE_ prefixed variables (standard Vite)
-    if (import.meta.env[`VITE_${key}`]) return import.meta.env[`VITE_${key}`];
+    if (meta.env[`VITE_${key}`]) return meta.env[`VITE_${key}`];
     // Check for direct access (if mapped in vite.config.ts)
-    if (import.meta.env[key]) return import.meta.env[key];
+    if (meta.env[key]) return meta.env[key];
   }
 
   // 2. Try process.env (Polyfilled by Vite or standard Node)

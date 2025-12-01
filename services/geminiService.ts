@@ -1,14 +1,13 @@
 import { GoogleGenAI } from "@google/genai";
 import { GEMINI_SYSTEM_PROMPT } from '../constants';
 
-const apiKey = process.env.API_KEY || ''; // In a real app, ensure this is set securely
-const ai = new GoogleGenAI({ apiKey });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 export const getGeminiResponse = async (
   message: string, 
   context?: string
 ): Promise<string> => {
-  if (!apiKey) {
+  if (!process.env.API_KEY) {
     return "API Key is missing. Please check your .env configuration.";
   }
 
