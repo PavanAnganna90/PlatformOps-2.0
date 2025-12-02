@@ -1,0 +1,5 @@
+{
+  "name": "OpsSight",
+  "description": "A next-generation DevOps visibility platform for home lab enthusiasts. Visualizes Kubernetes, Terraform, and Infrastructure logs with AI-powered insights.",
+  "requestFramePermissions": []
+}
