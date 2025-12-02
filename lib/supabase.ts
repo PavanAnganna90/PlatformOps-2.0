@@ -8,23 +8,29 @@ const env = typeof process !== 'undefined' && process.env ? process.env : {};
 
 // Access keys directly so the bundler can replace "process.env.REACT_APP_SUPABASE_URL" with the string literal.
 // We use a fallback chain for robustness.
-const supabaseUrl = 
+const cleanEnv = (val: string | undefined) => {
+  if (!val) return '';
+  // Remove leading/trailing quotes and whitespace
+  return val.replace(/^"|"$/g, '').replace(/^'|'$/g, '').trim();
+};
+
+const supabaseUrl = cleanEnv(
   // @ts-ignore
   process.env.REACT_APP_SUPABASE_URL || 
   // @ts-ignore
   process.env.VITE_SUPABASE_URL ||
   // @ts-ignore
-  env.REACT_APP_SUPABASE_URL || 
-  '';
+  env.REACT_APP_SUPABASE_URL
+);
 
-const supabaseAnonKey = 
+const supabaseAnonKey = cleanEnv(
   // @ts-ignore
   process.env.REACT_APP_SUPABASE_ANON_KEY || 
   // @ts-ignore
   process.env.VITE_SUPABASE_ANON_KEY ||
   // @ts-ignore
-  env.REACT_APP_SUPABASE_ANON_KEY || 
-  '';
+  env.REACT_APP_SUPABASE_ANON_KEY
+);
 
 // Debugging (Masked keys for security)
 const isConfigured = !!(supabaseUrl && supabaseAnonKey);
