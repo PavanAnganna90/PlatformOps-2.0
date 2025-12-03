@@ -14,7 +14,8 @@ export default defineConfig(({ mode }) => {
         NODE_ENV: JSON.stringify(mode),
         REACT_APP_SUPABASE_URL: JSON.stringify(env.REACT_APP_SUPABASE_URL || env.NEXT_PUBLIC_SUPABASE_URL || env.VITE_SUPABASE_URL || env.SUPABASE_URL),
         REACT_APP_SUPABASE_ANON_KEY: JSON.stringify(env.REACT_APP_SUPABASE_ANON_KEY || env.NEXT_PUBLIC_SUPABASE_ANON_KEY || env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY),
-        API_KEY: JSON.stringify(env.API_KEY || env.VITE_API_KEY)
+        API_KEY: JSON.stringify(env.API_KEY || env.VITE_API_KEY || env.VITE_GEMINI_API_KEY),
+        API_URL: JSON.stringify(env.VITE_API_URL || 'http://localhost:8000')
       }
     }
   };

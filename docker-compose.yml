@@ -1,0 +1,85 @@
+# ============================================================================
+# OpsSight - Docker Compose Configuration
+# ============================================================================
+# 
+# Quick Start:
+#   docker-compose up
+#
+# This will start:
+#   - Frontend (React + Vite) on http://localhost:5173
+#   - Backend API (FastAPI) on http://localhost:8000
+#
+# For production-like setup:
+#   docker-compose -f docker-compose.yml -f docker-compose.prod.yml up
+#
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # Frontend - React + Vite
+  # --------------------------------------------------------------------------
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        - VITE_API_URL=http://localhost:8000
+        - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-}
+        - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-}
+        - VITE_GEMINI_API_KEY=${VITE_GEMINI_API_KEY:-}
+    ports:
+      - "5173:80"
+    depends_on:
+      - api
+    environment:
+      - NODE_ENV=production
+    networks:
+      - opssight
+    restart: unless-stopped
+
+  # --------------------------------------------------------------------------
+  # Backend API - FastAPI
+  # --------------------------------------------------------------------------
+  api:
+    build:
+      context: ./apps/api
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - API_HOST=0.0.0.0
+      - API_PORT=8000
+      - API_DEBUG=${API_DEBUG:-true}
+      - API_CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+      - DATABASE_URL=${DATABASE_URL:-}
+      - VITE_SUPABASE_URL=${VITE_SUPABASE_URL:-}
+      - VITE_SUPABASE_ANON_KEY=${VITE_SUPABASE_ANON_KEY:-}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY:-}
+      - PROMETHEUS_URL=${PROMETHEUS_URL:-}
+      - ARGOCD_URL=${ARGOCD_URL:-}
+      - ARGOCD_TOKEN=${ARGOCD_TOKEN:-}
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_ORG=${GITHUB_ORG:-}
+    volumes:
+      # Mount kubeconfig for cluster access
+      - ${HOME}/.kube:/root/.kube:ro
+    networks:
+      - opssight
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+networks:
+  opssight:
+    driver: bridge
+
+# ============================================================================
+# Volumes (uncomment if using local database)
+# ============================================================================
+# volumes:
+#   postgres_data:
+

@@ -11,6 +11,7 @@ import { LoginView } from './components/views/LoginView';
 import { Bell, Search, Settings, ChevronDown, Loader2, Sun, Moon } from 'lucide-react';
 import { simulation } from './services/simulation';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { EnvironmentSelector } from './components/ui/EnvironmentSelector';
 
 const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -80,6 +81,9 @@ const MainLayout: React.FC = () => {
           </div>
 
           <div className="flex items-center gap-6">
+            {/* Environment/Cluster Selector */}
+            <EnvironmentSelector />
+            
             <div className="text-[10px] font-mono border border-slate-200 dark:border-slate-800 bg-white dark:bg-transparent px-2 py-1 rounded text-slate-500">
               {isDemoMode ? 'SIMULATION MODE' : 'PRODUCTION'}
             </div>
