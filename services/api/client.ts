@@ -107,6 +107,18 @@ export interface NamespaceInfo {
   labels: Record<string, string>;
 }
 
+export interface SwitchContextResponse {
+  success: boolean;
+  context: string;
+  error?: string;
+}
+
+export interface PodMetrics {
+  cpu_cores: number;
+  memory_bytes: number;
+  containers: number;
+}
+
 export interface ApiError {
   error: string;
   message: string;
@@ -270,6 +282,52 @@ class ApiClient {
     const queryString = params.toString();
     return this.request<PodInfo[]>(
       `/api/v1/kubernetes/pods${queryString ? `?${queryString}` : ''}`
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Context Management
+  // -------------------------------------------------------------------------
+
+  /**
+   * Switch Kubernetes context
+   */
+  async switchContext(context: string): Promise<SwitchContextResponse> {
+    return this.request<SwitchContextResponse>('/api/v1/kubernetes/context', {
+      method: 'POST',
+      body: JSON.stringify({ context }),
+    });
+  }
+
+  /**
+   * Get current context
+   */
+  async getCurrentContext(): Promise<{ context: string | null }> {
+    return this.request<{ context: string | null }>('/api/v1/kubernetes/context');
+  }
+
+  // -------------------------------------------------------------------------
+  // Metrics
+  // -------------------------------------------------------------------------
+
+  /**
+   * Get node metrics from metrics-server
+   */
+  async getNodeMetrics(cluster?: string): Promise<Record<string, NodeMetrics>> {
+    const params = cluster ? `?cluster=${encodeURIComponent(cluster)}` : '';
+    return this.request<Record<string, NodeMetrics>>(`/api/v1/kubernetes/metrics/nodes${params}`);
+  }
+
+  /**
+   * Get pod metrics from metrics-server
+   */
+  async getPodMetrics(namespace?: string, cluster?: string): Promise<Record<string, PodMetrics>> {
+    const params = new URLSearchParams();
+    if (namespace) params.set('namespace', namespace);
+    if (cluster) params.set('cluster', cluster);
+    const queryString = params.toString();
+    return this.request<Record<string, PodMetrics>>(
+      `/api/v1/kubernetes/metrics/pods${queryString ? `?${queryString}` : ''}`
     );
   }
 }

@@ -11,6 +11,7 @@ import { LoginView } from './components/views/LoginView';
 import { Bell, Search, Settings, ChevronDown, Loader2, Sun, Moon } from 'lucide-react';
 import { simulation } from './services/simulation';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { ClusterProvider } from './contexts/ClusterContext';
 import { EnvironmentSelector } from './components/ui/EnvironmentSelector';
 
 const MainLayout: React.FC = () => {
@@ -146,7 +147,9 @@ const MainLayout: React.FC = () => {
 const App: React.FC = () => {
   return (
     <AuthProvider>
-      <MainLayout />
+      <ClusterProvider>
+        <MainLayout />
+      </ClusterProvider>
     </AuthProvider>
   );
 };

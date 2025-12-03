@@ -5,20 +5,34 @@ Provides REST endpoints for Kubernetes cluster management,
 including listing clusters, nodes, pods, and namespaces.
 """
 
-from typing import List, Optional
+from typing import Dict, List, Optional
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, HTTPException
+from pydantic import BaseModel
 
 from app.schemas.kubernetes import (
     ClusterInfo,
     ClusterListResponse,
     NamespaceInfo,
     NodeInfo,
+    NodeMetrics,
     PodInfo,
 )
 from app.services.kubernetes import get_kubernetes_service
 
 router = APIRouter(prefix="/kubernetes")
+
+
+class SwitchContextRequest(BaseModel):
+    """Request to switch Kubernetes context."""
+    context: str
+
+
+class SwitchContextResponse(BaseModel):
+    """Response from context switch."""
+    success: bool
+    context: str
+    error: Optional[str] = None
 
 
 @router.get(
@@ -191,4 +205,116 @@ async def list_namespace_pods(
     """
     service = get_kubernetes_service()
     return service.get_pods(namespace=namespace, cluster=cluster)
+
+
+# -------------------------------------------------------------------------
+# Context Management
+# -------------------------------------------------------------------------
+
+@router.post(
+    "/context",
+    response_model=SwitchContextResponse,
+    summary="Switch Kubernetes Context",
+    description="Switch to a different Kubernetes cluster context.",
+)
+async def switch_context(request: SwitchContextRequest) -> SwitchContextResponse:
+    """
+    Switch to a different Kubernetes context.
+    
+    This changes which cluster subsequent API calls will target.
+    
+    Args:
+        request: Contains the context name to switch to
+        
+    Returns:
+        SwitchContextResponse indicating success or failure
+    """
+    service = get_kubernetes_service()
+    success, error = service.switch_context(request.context)
+    
+    return SwitchContextResponse(
+        success=success,
+        context=request.context,
+        error=error,
+    )
+
+
+@router.get(
+    "/context",
+    summary="Get Current Context",
+    description="Returns the currently active Kubernetes context.",
+)
+async def get_current_context() -> dict:
+    """
+    Get the currently active context.
+    
+    Returns:
+        Dict with current context name
+    """
+    service = get_kubernetes_service()
+    context = service.get_current_context()
+    
+    return {"context": context}
+
+
+# -------------------------------------------------------------------------
+# Metrics
+# -------------------------------------------------------------------------
+
+@router.get(
+    "/metrics/nodes",
+    response_model=Dict[str, NodeMetrics],
+    summary="Get Node Metrics",
+    description="Returns real-time CPU/Memory metrics for nodes from metrics-server.",
+)
+async def get_node_metrics(
+    cluster: Optional[str] = Query(
+        default=None,
+        description="Cluster name (uses active cluster if not specified)",
+    ),
+) -> Dict[str, NodeMetrics]:
+    """
+    Get real-time metrics for all nodes.
+    
+    Requires metrics-server to be installed in the cluster.
+    
+    Args:
+        cluster: Optional cluster name
+        
+    Returns:
+        Dict mapping node name to NodeMetrics
+    """
+    service = get_kubernetes_service()
+    return service.get_node_metrics(cluster=cluster)
+
+
+@router.get(
+    "/metrics/pods",
+    summary="Get Pod Metrics",
+    description="Returns real-time CPU/Memory metrics for pods from metrics-server.",
+)
+async def get_pod_metrics(
+    namespace: Optional[str] = Query(
+        default=None,
+        description="Filter by namespace",
+    ),
+    cluster: Optional[str] = Query(
+        default=None,
+        description="Cluster name (uses active cluster if not specified)",
+    ),
+) -> Dict[str, dict]:
+    """
+    Get real-time metrics for pods.
+    
+    Requires metrics-server to be installed in the cluster.
+    
+    Args:
+        namespace: Optional namespace filter
+        cluster: Optional cluster name
+        
+    Returns:
+        Dict mapping "namespace/pod_name" to metrics
+    """
+    service = get_kubernetes_service()
+    return service.get_pod_metrics(namespace=namespace, cluster=cluster)
 

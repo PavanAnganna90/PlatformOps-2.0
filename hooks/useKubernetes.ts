@@ -3,15 +3,19 @@
  * 
  * Provides hooks to fetch real data from the backend API,
  * with automatic fallback to demo data when backend is unavailable.
+ * 
+ * These hooks can be used standalone or with ClusterContext for
+ * app-wide cluster state management.
  */
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import { 
   apiClient, 
   ClusterInfo, 
   NodeInfo, 
   PodInfo, 
   NamespaceInfo,
+  NodeMetrics,
   ClusterListResponse 
 } from '../services/api';
 import { InfrastructureNode, ResourceType, Status } from '../types';
@@ -351,5 +355,91 @@ export function useActiveCluster(): {
   }, [clusters, activeCluster]);
 
   return { activeCluster, setActiveCluster, clusters, isLoading };
+}
+
+/**
+ * Hook to fetch real node metrics from metrics-server
+ */
+export function useNodeMetrics(cluster?: string): UseKubernetesState<Record<string, NodeMetrics>> {
+  const [data, setData] = useState<Record<string, NodeMetrics>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const available = await apiClient.checkBackendAvailable();
+      setIsBackendConnected(available);
+
+      if (available) {
+        const metrics = await apiClient.getNodeMetrics(cluster);
+        setData(metrics);
+      } else {
+        setData({});
+      }
+    } catch (err) {
+      // Metrics not available is not necessarily an error
+      setError(null);
+      setData({});
+    } finally {
+      setIsLoading(false);
+    }
+  }, [cluster]);
+
+  useEffect(() => {
+    fetchData();
+    
+    // Refresh metrics every 15 seconds
+    const interval = setInterval(fetchData, 15000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  return { data, isLoading, error, refetch: fetchData, isBackendConnected };
+}
+
+/**
+ * Hook to fetch real pod metrics from metrics-server
+ */
+export function usePodMetrics(namespace?: string, cluster?: string): UseKubernetesState<Record<string, any>> {
+  const [data, setData] = useState<Record<string, any>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isBackendConnected, setIsBackendConnected] = useState(false);
+
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const available = await apiClient.checkBackendAvailable();
+      setIsBackendConnected(available);
+
+      if (available) {
+        const metrics = await apiClient.getPodMetrics(namespace, cluster);
+        setData(metrics);
+      } else {
+        setData({});
+      }
+    } catch (err) {
+      // Metrics not available is not necessarily an error
+      setError(null);
+      setData({});
+    } finally {
+      setIsLoading(false);
+    }
+  }, [namespace, cluster]);
+
+  useEffect(() => {
+    fetchData();
+    
+    // Refresh metrics every 15 seconds
+    const interval = setInterval(fetchData, 15000);
+    return () => clearInterval(interval);
+  }, [fetchData]);
+
+  return { data, isLoading, error, refetch: fetchData, isBackendConnected };
 }
 

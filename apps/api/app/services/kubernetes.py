@@ -34,7 +34,8 @@ class KubernetesService:
     Handles:
     - Multi-cluster management
     - Resource listing (nodes, pods, namespaces)
-    - Metrics collection
+    - Metrics collection (from metrics-server)
+    - Context switching
     - Graceful error handling
     """
     
@@ -43,6 +44,7 @@ class KubernetesService:
         self._clients: Dict[str, object] = {}
         self._active_context: Optional[str] = None
         self._k8s_available = False
+        self._current_context: Optional[str] = None
         
         # Try to import kubernetes
         try:
@@ -394,6 +396,237 @@ class KubernetesService:
         except Exception as e:
             logger.error(f"Failed to get namespaces: {e}")
             return self._get_demo_namespaces()
+    
+    def switch_context(self, context: str) -> Tuple[bool, Optional[str]]:
+        """
+        Switch to a different Kubernetes context.
+        
+        Args:
+            context: Name of the context to switch to
+            
+        Returns:
+            Tuple of (success, error_message)
+        """
+        if not self._k8s_available:
+            return False, "kubernetes package not installed"
+        
+        settings = get_settings()
+        kubeconfig_path = settings.kubeconfig_path
+        
+        if not kubeconfig_path or not kubeconfig_path.exists():
+            return False, "No kubeconfig found"
+        
+        try:
+            # Load the specific context
+            self._k8s_config.load_kube_config(
+                config_file=str(kubeconfig_path),
+                context=context
+            )
+            self._current_context = context
+            logger.info(f"Switched to context: {context}")
+            return True, None
+            
+        except Exception as e:
+            logger.error(f"Failed to switch context to {context}: {e}")
+            return False, str(e)
+    
+    def get_current_context(self) -> Optional[str]:
+        """Get the currently active context name."""
+        if self._current_context:
+            return self._current_context
+        
+        settings = get_settings()
+        kubeconfig_path = settings.kubeconfig_path
+        
+        if not kubeconfig_path or not kubeconfig_path.exists():
+            return None
+        
+        try:
+            contexts, active_context = self._k8s_config.list_kube_config_contexts(
+                config_file=str(kubeconfig_path)
+            )
+            return active_context.get("name") if active_context else None
+        except Exception:
+            return None
+    
+    def get_node_metrics(self, cluster: Optional[str] = None) -> Dict[str, NodeMetrics]:
+        """
+        Get real metrics for nodes from metrics-server.
+        
+        Args:
+            cluster: Cluster context name
+            
+        Returns:
+            Dict mapping node name to NodeMetrics
+        """
+        if cluster:
+            self.switch_context(cluster)
+        
+        success, error = self._load_kubeconfig()
+        if not success:
+            return {}
+        
+        try:
+            # Use CustomObjectsApi to access metrics.k8s.io
+            custom_api = self._k8s_client.CustomObjectsApi()
+            
+            # Get node metrics from metrics-server
+            metrics = custom_api.list_cluster_custom_object(
+                group="metrics.k8s.io",
+                version="v1beta1",
+                plural="nodes"
+            )
+            
+            result = {}
+            for item in metrics.get("items", []):
+                node_name = item["metadata"]["name"]
+                usage = item.get("usage", {})
+                
+                # Parse CPU (format: "123m" or "1")
+                cpu_str = usage.get("cpu", "0")
+                if cpu_str.endswith("n"):
+                    cpu_cores = float(cpu_str[:-1]) / 1_000_000_000
+                elif cpu_str.endswith("m"):
+                    cpu_cores = float(cpu_str[:-1]) / 1000
+                else:
+                    cpu_cores = float(cpu_str)
+                
+                # Parse Memory (format: "123Ki" or "123Mi")
+                mem_str = usage.get("memory", "0")
+                if mem_str.endswith("Ki"):
+                    mem_bytes = int(mem_str[:-2]) * 1024
+                elif mem_str.endswith("Mi"):
+                    mem_bytes = int(mem_str[:-2]) * 1024 * 1024
+                elif mem_str.endswith("Gi"):
+                    mem_bytes = int(mem_str[:-2]) * 1024 * 1024 * 1024
+                else:
+                    mem_bytes = int(mem_str) if mem_str.isdigit() else 0
+                
+                # Get node capacity for percentage calculation
+                core_v1 = self._k8s_client.CoreV1Api()
+                node = core_v1.read_node(node_name)
+                
+                capacity = node.status.capacity or {}
+                allocatable = node.status.allocatable or {}
+                
+                # Parse capacity
+                cpu_capacity_str = capacity.get("cpu", "1")
+                cpu_capacity = float(cpu_capacity_str)
+                
+                mem_capacity_str = capacity.get("memory", "0")
+                if mem_capacity_str.endswith("Ki"):
+                    mem_capacity = int(mem_capacity_str[:-2]) * 1024
+                elif mem_capacity_str.endswith("Mi"):
+                    mem_capacity = int(mem_capacity_str[:-2]) * 1024 * 1024
+                elif mem_capacity_str.endswith("Gi"):
+                    mem_capacity = int(mem_capacity_str[:-2]) * 1024 * 1024 * 1024
+                else:
+                    mem_capacity = int(mem_capacity_str) if mem_capacity_str.isdigit() else 1
+                
+                # Calculate percentages
+                cpu_percent = (cpu_cores / cpu_capacity * 100) if cpu_capacity > 0 else 0
+                mem_percent = (mem_bytes / mem_capacity * 100) if mem_capacity > 0 else 0
+                
+                # Get pod count
+                pods = core_v1.list_pod_for_all_namespaces(field_selector=f"spec.nodeName={node_name}")
+                pod_count = len(pods.items)
+                pod_capacity = int(allocatable.get("pods", "110"))
+                
+                result[node_name] = NodeMetrics(
+                    cpu_usage_percent=min(cpu_percent, 100),
+                    cpu_capacity_cores=cpu_capacity,
+                    cpu_allocatable_cores=float(allocatable.get("cpu", str(cpu_capacity))),
+                    memory_usage_percent=min(mem_percent, 100),
+                    memory_capacity_bytes=mem_capacity,
+                    memory_allocatable_bytes=mem_capacity,
+                    pod_count=pod_count,
+                    pod_capacity=pod_capacity,
+                )
+            
+            return result
+            
+        except Exception as e:
+            logger.warning(f"Failed to get node metrics (metrics-server may not be installed): {e}")
+            return {}
+    
+    def get_pod_metrics(self, namespace: Optional[str] = None, cluster: Optional[str] = None) -> Dict[str, dict]:
+        """
+        Get real metrics for pods from metrics-server.
+        
+        Args:
+            namespace: Filter by namespace
+            cluster: Cluster context name
+            
+        Returns:
+            Dict mapping "namespace/pod_name" to metrics dict
+        """
+        if cluster:
+            self.switch_context(cluster)
+        
+        success, error = self._load_kubeconfig()
+        if not success:
+            return {}
+        
+        try:
+            custom_api = self._k8s_client.CustomObjectsApi()
+            
+            if namespace:
+                metrics = custom_api.list_namespaced_custom_object(
+                    group="metrics.k8s.io",
+                    version="v1beta1",
+                    namespace=namespace,
+                    plural="pods"
+                )
+            else:
+                metrics = custom_api.list_cluster_custom_object(
+                    group="metrics.k8s.io",
+                    version="v1beta1",
+                    plural="pods"
+                )
+            
+            result = {}
+            for item in metrics.get("items", []):
+                pod_name = item["metadata"]["name"]
+                pod_ns = item["metadata"]["namespace"]
+                containers = item.get("containers", [])
+                
+                total_cpu = 0
+                total_mem = 0
+                
+                for container in containers:
+                    usage = container.get("usage", {})
+                    
+                    # Parse CPU
+                    cpu_str = usage.get("cpu", "0")
+                    if cpu_str.endswith("n"):
+                        total_cpu += float(cpu_str[:-1]) / 1_000_000_000
+                    elif cpu_str.endswith("m"):
+                        total_cpu += float(cpu_str[:-1]) / 1000
+                    else:
+                        total_cpu += float(cpu_str) if cpu_str else 0
+                    
+                    # Parse Memory
+                    mem_str = usage.get("memory", "0")
+                    if mem_str.endswith("Ki"):
+                        total_mem += int(mem_str[:-2]) * 1024
+                    elif mem_str.endswith("Mi"):
+                        total_mem += int(mem_str[:-2]) * 1024 * 1024
+                    elif mem_str.endswith("Gi"):
+                        total_mem += int(mem_str[:-2]) * 1024 * 1024 * 1024
+                    else:
+                        total_mem += int(mem_str) if mem_str.isdigit() else 0
+                
+                result[f"{pod_ns}/{pod_name}"] = {
+                    "cpu_cores": total_cpu,
+                    "memory_bytes": total_mem,
+                    "containers": len(containers),
+                }
+            
+            return result
+            
+        except Exception as e:
+            logger.warning(f"Failed to get pod metrics: {e}")
+            return {}
     
     # -------------------------------------------------------------------------
     # Demo Data (used when no real cluster is connected)

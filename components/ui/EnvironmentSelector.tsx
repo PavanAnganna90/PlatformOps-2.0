@@ -2,10 +2,10 @@
  * Environment Selector Component
  * 
  * Displays the current environment/cluster and allows switching between
- * configured clusters. Shows connection status for each cluster.
+ * configured clusters. Uses ClusterContext for app-wide state management.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { 
   Cloud, 
   ChevronDown, 
@@ -17,7 +17,8 @@ import {
   Wifi,
   WifiOff
 } from 'lucide-react';
-import { apiClient, ClusterInfo, ClusterListResponse } from '../../services/api';
+import { useCluster } from '../../contexts/ClusterContext';
+import { ClusterInfo } from '../../services/api';
 
 interface EnvironmentSelectorProps {
   /**
@@ -36,12 +37,19 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
   className = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
-  const [clusters, setClusters] = useState<ClusterInfo[]>([]);
-  const [activeCluster, setActiveCluster] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isBackendAvailable, setIsBackendAvailable] = useState<boolean | null>(null);
+  const [isSwitching, setIsSwitching] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  
+  // Use ClusterContext for state
+  const { 
+    clusters, 
+    activeCluster, 
+    isLoading, 
+    error, 
+    isBackendConnected,
+    setActiveCluster,
+    refreshClusters,
+  } = useCluster();
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -55,68 +63,26 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Fetch clusters on mount
-  useEffect(() => {
-    fetchClusters();
-  }, []);
+  const handleClusterSelect = async (cluster: ClusterInfo) => {
+    if (cluster.context === activeCluster?.context) {
+      setIsOpen(false);
+      return;
+    }
 
-  const fetchClusters = async () => {
-    setIsLoading(true);
-    setError(null);
-
+    setIsSwitching(true);
     try {
-      // First check if backend is available
-      const available = await apiClient.checkBackendAvailable();
-      setIsBackendAvailable(available);
-
-      if (!available) {
-        // Use demo data if backend is not available
-        setClusters([
-          {
-            name: 'Demo Cluster',
-            context: 'demo-local',
-            status: 'connected',
-            version: '1.28',
-            node_count: 3,
-            namespace_count: 8,
-            pod_count: 24,
-          },
-        ]);
-        setActiveCluster('demo-local');
-        return;
-      }
-
-      const response: ClusterListResponse = await apiClient.listClusters();
-      setClusters(response.clusters);
-      setActiveCluster(response.active_cluster || response.clusters[0]?.context || null);
-    } catch (err) {
-      console.error('Failed to fetch clusters:', err);
-      setError('Failed to load clusters');
-      // Fallback to demo data
-      setClusters([
-        {
-          name: 'Demo Cluster',
-          context: 'demo-local',
-          status: 'connected',
-          version: '1.28',
-          node_count: 3,
-          namespace_count: 8,
-          pod_count: 24,
-        },
-      ]);
-      setActiveCluster('demo-local');
+      await setActiveCluster(cluster);
+      onClusterChange?.(cluster);
     } finally {
-      setIsLoading(false);
+      setIsSwitching(false);
+      setIsOpen(false);
     }
   };
 
-  const handleClusterSelect = (cluster: ClusterInfo) => {
-    setActiveCluster(cluster.context);
-    setIsOpen(false);
-    onClusterChange?.(cluster);
+  const handleRefresh = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    await refreshClusters();
   };
-
-  const currentCluster = clusters.find(c => c.context === activeCluster) || clusters[0];
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -149,7 +115,7 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
       {/* Trigger Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        disabled={isLoading}
+        disabled={isLoading || isSwitching}
         className={`
           flex items-center gap-2 px-3 py-2 rounded-xl
           bg-white dark:bg-[#0F1115] 
@@ -158,21 +124,22 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
           transition-all duration-200
           shadow-sm dark:shadow-lg
           ${isOpen ? 'ring-2 ring-primary/20' : ''}
+          ${isSwitching ? 'opacity-70' : ''}
         `}
       >
-        {isLoading ? (
+        {isLoading || isSwitching ? (
           <Loader2 size={16} className="animate-spin text-slate-400" />
         ) : (
           <>
             <Cloud size={16} className="text-primary" />
             <div className="flex flex-col items-start">
               <span className="text-xs font-semibold text-slate-900 dark:text-white leading-none">
-                {currentCluster?.name || 'No Cluster'}
+                {activeCluster?.name || 'No Cluster'}
               </span>
               <span className="text-[10px] text-slate-500 flex items-center gap-1 mt-0.5">
-                {getStatusIcon(currentCluster?.status || 'unknown')}
-                <span className={getStatusColor(currentCluster?.status || 'unknown')}>
-                  {currentCluster?.status || 'unknown'}
+                {getStatusIcon(activeCluster?.status || 'unknown')}
+                <span className={getStatusColor(activeCluster?.status || 'unknown')}>
+                  {activeCluster?.status || 'unknown'}
                 </span>
               </span>
             </div>
@@ -200,21 +167,18 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
               Clusters
             </span>
             <div className="flex items-center gap-2">
-              {isBackendAvailable === false && (
+              {!isBackendConnected && (
                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">
                   Demo Mode
                 </span>
               )}
               <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  apiClient.resetAvailabilityCheck();
-                  fetchClusters();
-                }}
-                className="p-1 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors"
+                onClick={handleRefresh}
+                disabled={isLoading}
+                className="p-1 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg transition-colors disabled:opacity-50"
                 title="Refresh clusters"
               >
-                <RefreshCw size={12} className="text-slate-400" />
+                <RefreshCw size={12} className={`text-slate-400 ${isLoading ? 'animate-spin' : ''}`} />
               </button>
             </div>
           </div>
@@ -238,11 +202,13 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
               <button
                 key={cluster.context}
                 onClick={() => handleClusterSelect(cluster)}
+                disabled={isSwitching}
                 className={`
                   w-full px-4 py-3 flex items-center gap-3
                   hover:bg-slate-50 dark:hover:bg-white/5
                   transition-colors text-left
-                  ${cluster.context === activeCluster ? 'bg-primary/5 dark:bg-primary/10' : ''}
+                  disabled:opacity-50
+                  ${cluster.context === activeCluster?.context ? 'bg-primary/5 dark:bg-primary/10' : ''}
                 `}
               >
                 <div className={`
@@ -282,7 +248,7 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
                   </div>
                 </div>
 
-                {cluster.context === activeCluster && (
+                {cluster.context === activeCluster?.context && (
                   <Check size={16} className="text-primary shrink-0" />
                 )}
               </button>
@@ -292,7 +258,7 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
           {/* Footer */}
           <div className="px-4 py-2 border-t border-slate-100 dark:border-white/5 bg-slate-50 dark:bg-black/20">
             <p className="text-[10px] text-slate-400">
-              {isBackendAvailable 
+              {isBackendConnected 
                 ? 'Connected to OpsSight API'
                 : 'Running in demo mode - Start backend for real data'}
             </p>
@@ -304,4 +270,3 @@ export const EnvironmentSelector: React.FC<EnvironmentSelectorProps> = ({
 };
 
 export default EnvironmentSelector;
-
