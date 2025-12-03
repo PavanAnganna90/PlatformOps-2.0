@@ -1,24 +1,25 @@
 /**
  * React hooks for Kubernetes data fetching
- * 
+ *
  * Provides hooks to fetch real data from the backend API,
  * with automatic fallback to demo data when backend is unavailable.
- * 
- * These hooks can be used standalone or with ClusterContext for
- * app-wide cluster state management.
+ *
+ * These hooks automatically refresh when the active cluster changes
+ * via ClusterContext.
  */
 
-import { useState, useEffect, useCallback, useContext } from 'react';
-import { 
-  apiClient, 
-  ClusterInfo, 
-  NodeInfo, 
-  PodInfo, 
+import { useState, useEffect, useCallback } from "react";
+import {
+  apiClient,
+  ClusterInfo,
+  NodeInfo,
+  PodInfo,
   NamespaceInfo,
   NodeMetrics,
-  ClusterListResponse 
-} from '../services/api';
-import { InfrastructureNode, ResourceType, Status } from '../types';
+  ClusterListResponse,
+} from "../services/api";
+import { InfrastructureNode, ResourceType, Status } from "../types";
+import { useCluster } from "../contexts/ClusterContext";
 
 // ============================================================================
 // Types
@@ -32,6 +33,14 @@ interface UseKubernetesState<T> {
   isBackendConnected: boolean;
 }
 
+interface UseKubernetesOptions {
+  /**
+   * If true, automatically refetch when cluster context changes
+   * @default true
+   */
+  autoRefreshOnClusterChange?: boolean;
+}
+
 // ============================================================================
 // Utility Functions
 // ============================================================================
@@ -41,15 +50,15 @@ interface UseKubernetesState<T> {
  */
 const mapStatus = (status: string): Status => {
   switch (status) {
-    case 'healthy':
-    case 'connected':
+    case "healthy":
+    case "connected":
       return Status.HEALTHY;
-    case 'warning':
+    case "warning":
       return Status.WARNING;
-    case 'error':
-    case 'disconnected':
+    case "error":
+    case "disconnected":
       return Status.ERROR;
-    case 'pending':
+    case "pending":
       return Status.PENDING;
     default:
       return Status.HEALTHY;
@@ -62,7 +71,8 @@ const mapStatus = (status: string): Status => {
 const nodeToInfraNode = (node: NodeInfo): InfrastructureNode => ({
   id: `node-${node.name}`,
   name: node.name,
-  type: node.role === 'control-plane' ? ResourceType.K8S_CLUSTER : ResourceType.NODE,
+  type:
+    node.role === "control-plane" ? ResourceType.K8S_CLUSTER : ResourceType.NODE,
   status: mapStatus(node.status),
   metrics: {
     cpu: node.metrics?.cpu_usage_percent ?? Math.random() * 50 + 10,
@@ -71,9 +81,11 @@ const nodeToInfraNode = (node: NodeInfo): InfrastructureNode => ({
     latency: 0,
   },
   description: `${node.kubernetes_version} • ${node.os_image}`,
-  region: node.internal_ip || 'local',
-  uptime: node.created_at ? getUptime(new Date(node.created_at)) : 'unknown',
-  tags: Object.entries(node.labels || {}).slice(0, 3).map(([k, v]) => `${k}=${v}`),
+  region: node.internal_ip || "local",
+  uptime: node.created_at ? getUptime(new Date(node.created_at)) : "unknown",
+  tags: Object.entries(node.labels || {})
+    .slice(0, 3)
+    .map(([k, v]) => `${k}=${v}`),
 });
 
 /**
@@ -82,8 +94,8 @@ const nodeToInfraNode = (node: NodeInfo): InfrastructureNode => ({
 const podToInfraNode = (pod: PodInfo): InfrastructureNode => {
   // Determine status based on phase and restart count
   let status = Status.HEALTHY;
-  if (pod.phase === 'Failed') status = Status.ERROR;
-  else if (pod.phase === 'Pending') status = Status.PENDING;
+  if (pod.phase === "Failed") status = Status.ERROR;
+  else if (pod.phase === "Pending") status = Status.PENDING;
   else if (pod.restart_count > 5) status = Status.WARNING;
 
   return {
@@ -98,9 +110,11 @@ const podToInfraNode = (pod: PodInfo): InfrastructureNode => {
       latency: 0,
     },
     description: `${pod.namespace} • ${pod.containers.length} container(s) • ${pod.restart_count} restarts`,
-    region: pod.node_name || 'unscheduled',
-    uptime: pod.created_at ? getUptime(new Date(pod.created_at)) : 'unknown',
-    tags: Object.entries(pod.labels || {}).slice(0, 3).map(([k, v]) => v),
+    region: pod.node_name || "unscheduled",
+    uptime: pod.created_at ? getUptime(new Date(pod.created_at)) : "unknown",
+    tags: Object.entries(pod.labels || {})
+      .slice(0, 3)
+      .map(([, v]) => v),
   };
 };
 
@@ -112,10 +126,10 @@ const getUptime = (date: Date): string => {
   const diff = now.getTime() - date.getTime();
   const days = Math.floor(diff / (1000 * 60 * 60 * 24));
   const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  
+
   if (days > 0) return `${days}d ${hours}h`;
   if (hours > 0) return `${hours}h`;
-  return 'just now';
+  return "just now";
 };
 
 // ============================================================================
@@ -144,18 +158,20 @@ export function useClusters(): UseKubernetesState<ClusterInfo[]> {
         setData(response.clusters);
       } else {
         // Demo data
-        setData([{
-          name: 'Demo Cluster',
-          context: 'demo',
-          status: 'connected',
-          version: '1.28',
-          node_count: 3,
-          namespace_count: 8,
-          pod_count: 24,
-        }]);
+        setData([
+          {
+            name: "Demo Cluster",
+            context: "demo",
+            status: "connected",
+            version: "1.28",
+            node_count: 3,
+            namespace_count: 8,
+            pod_count: 24,
+          },
+        ]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch clusters');
+      setError(err instanceof Error ? err.message : "Failed to fetch clusters");
       setData([]);
     } finally {
       setIsLoading(false);
@@ -170,9 +186,14 @@ export function useClusters(): UseKubernetesState<ClusterInfo[]> {
 }
 
 /**
- * Hook to fetch nodes
+ * Hook to fetch nodes - automatically refreshes on cluster change
  */
-export function useNodes(cluster?: string): UseKubernetesState<NodeInfo[]> {
+export function useNodes(
+  options: UseKubernetesOptions = {}
+): UseKubernetesState<NodeInfo[]> {
+  const { autoRefreshOnClusterChange = true } = options;
+  const { activeCluster, refreshTrigger, isBackendConnected: ctxBackendConnected } = useCluster();
+
   const [data, setData] = useState<NodeInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -187,30 +208,44 @@ export function useNodes(cluster?: string): UseKubernetesState<NodeInfo[]> {
       setIsBackendConnected(available);
 
       if (available) {
-        const nodes = await apiClient.listNodes(cluster);
+        const nodes = await apiClient.listNodes(activeCluster?.context);
         setData(nodes);
       } else {
         setData([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch nodes');
+      setError(err instanceof Error ? err.message : "Failed to fetch nodes");
       setData([]);
     } finally {
       setIsLoading(false);
     }
-  }, [cluster]);
+  }, [activeCluster?.context]);
 
+  // Fetch on mount and when cluster changes
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Refetch when refreshTrigger changes (cluster switch)
+  useEffect(() => {
+    if (autoRefreshOnClusterChange && refreshTrigger > 0) {
+      fetchData();
+    }
+  }, [refreshTrigger, autoRefreshOnClusterChange, fetchData]);
 
   return { data, isLoading, error, refetch: fetchData, isBackendConnected };
 }
 
 /**
- * Hook to fetch pods
+ * Hook to fetch pods - automatically refreshes on cluster change
  */
-export function usePods(namespace?: string, cluster?: string): UseKubernetesState<PodInfo[]> {
+export function usePods(
+  namespace?: string,
+  options: UseKubernetesOptions = {}
+): UseKubernetesState<PodInfo[]> {
+  const { autoRefreshOnClusterChange = true } = options;
+  const { activeCluster, refreshTrigger } = useCluster();
+
   const [data, setData] = useState<PodInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -225,30 +260,42 @@ export function usePods(namespace?: string, cluster?: string): UseKubernetesStat
       setIsBackendConnected(available);
 
       if (available) {
-        const pods = await apiClient.listPods(namespace, cluster);
+        const pods = await apiClient.listPods(namespace, activeCluster?.context);
         setData(pods);
       } else {
         setData([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch pods');
+      setError(err instanceof Error ? err.message : "Failed to fetch pods");
       setData([]);
     } finally {
       setIsLoading(false);
     }
-  }, [namespace, cluster]);
+  }, [namespace, activeCluster?.context]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
+  // Refetch when refreshTrigger changes (cluster switch)
+  useEffect(() => {
+    if (autoRefreshOnClusterChange && refreshTrigger > 0) {
+      fetchData();
+    }
+  }, [refreshTrigger, autoRefreshOnClusterChange, fetchData]);
+
   return { data, isLoading, error, refetch: fetchData, isBackendConnected };
 }
 
 /**
- * Hook to fetch namespaces
+ * Hook to fetch namespaces - automatically refreshes on cluster change
  */
-export function useNamespaces(cluster?: string): UseKubernetesState<NamespaceInfo[]> {
+export function useNamespaces(
+  options: UseKubernetesOptions = {}
+): UseKubernetesState<NamespaceInfo[]> {
+  const { autoRefreshOnClusterChange = true } = options;
+  const { activeCluster, refreshTrigger } = useCluster();
+
   const [data, setData] = useState<NamespaceInfo[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -263,22 +310,31 @@ export function useNamespaces(cluster?: string): UseKubernetesState<NamespaceInf
       setIsBackendConnected(available);
 
       if (available) {
-        const namespaces = await apiClient.listNamespaces(cluster);
+        const namespaces = await apiClient.listNamespaces(activeCluster?.context);
         setData(namespaces);
       } else {
         setData([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch namespaces');
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch namespaces"
+      );
       setData([]);
     } finally {
       setIsLoading(false);
     }
-  }, [cluster]);
+  }, [activeCluster?.context]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Refetch when refreshTrigger changes (cluster switch)
+  useEffect(() => {
+    if (autoRefreshOnClusterChange && refreshTrigger > 0) {
+      fetchData();
+    }
+  }, [refreshTrigger, autoRefreshOnClusterChange, fetchData]);
 
   return { data, isLoading, error, refetch: fetchData, isBackendConnected };
 }
@@ -286,8 +342,14 @@ export function useNamespaces(cluster?: string): UseKubernetesState<NamespaceInf
 /**
  * Combined hook for Infrastructure view
  * Fetches both nodes and pods and converts them to InfrastructureNode format
+ * Automatically refreshes on cluster change
  */
-export function useInfrastructure(cluster?: string): UseKubernetesState<InfrastructureNode[]> {
+export function useInfrastructure(
+  options: UseKubernetesOptions = {}
+): UseKubernetesState<InfrastructureNode[]> {
+  const { autoRefreshOnClusterChange = true } = options;
+  const { activeCluster, refreshTrigger, isBackendConnected: ctxBackendConnected } = useCluster();
+
   const [data, setData] = useState<InfrastructureNode[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -304,8 +366,8 @@ export function useInfrastructure(cluster?: string): UseKubernetesState<Infrastr
       if (available) {
         // Fetch nodes and pods in parallel
         const [nodes, pods] = await Promise.all([
-          apiClient.listNodes(cluster),
-          apiClient.listPods(undefined, cluster),
+          apiClient.listNodes(activeCluster?.context),
+          apiClient.listPods(undefined, activeCluster?.context),
         ]);
 
         // Convert to InfrastructureNode format
@@ -320,22 +382,32 @@ export function useInfrastructure(cluster?: string): UseKubernetesState<Infrastr
         setData([]);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch infrastructure');
+      setError(
+        err instanceof Error ? err.message : "Failed to fetch infrastructure"
+      );
       setData([]);
     } finally {
       setIsLoading(false);
     }
-  }, [cluster]);
+  }, [activeCluster?.context]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // Refetch when refreshTrigger changes (cluster switch)
+  useEffect(() => {
+    if (autoRefreshOnClusterChange && refreshTrigger > 0) {
+      fetchData();
+    }
+  }, [refreshTrigger, autoRefreshOnClusterChange, fetchData]);
 
   return { data, isLoading, error, refetch: fetchData, isBackendConnected };
 }
 
 /**
  * Hook to get active cluster from context
+ * @deprecated Use useCluster() from ClusterContext instead
  */
 export function useActiveCluster(): {
   activeCluster: ClusterInfo | null;
@@ -349,7 +421,7 @@ export function useActiveCluster(): {
   useEffect(() => {
     if (clusters.length > 0 && !activeCluster) {
       // Set first connected cluster as active
-      const connected = clusters.find(c => c.status === 'connected');
+      const connected = clusters.find((c) => c.status === "connected");
       setActiveCluster(connected || clusters[0]);
     }
   }, [clusters, activeCluster]);
@@ -359,8 +431,14 @@ export function useActiveCluster(): {
 
 /**
  * Hook to fetch real node metrics from metrics-server
+ * Automatically refreshes on cluster change
  */
-export function useNodeMetrics(cluster?: string): UseKubernetesState<Record<string, NodeMetrics>> {
+export function useNodeMetrics(
+  options: UseKubernetesOptions = {}
+): UseKubernetesState<Record<string, NodeMetrics>> {
+  const { autoRefreshOnClusterChange = true } = options;
+  const { activeCluster, refreshTrigger } = useCluster();
+
   const [data, setData] = useState<Record<string, NodeMetrics>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -375,7 +453,7 @@ export function useNodeMetrics(cluster?: string): UseKubernetesState<Record<stri
       setIsBackendConnected(available);
 
       if (available) {
-        const metrics = await apiClient.getNodeMetrics(cluster);
+        const metrics = await apiClient.getNodeMetrics(activeCluster?.context);
         setData(metrics);
       } else {
         setData({});
@@ -387,23 +465,37 @@ export function useNodeMetrics(cluster?: string): UseKubernetesState<Record<stri
     } finally {
       setIsLoading(false);
     }
-  }, [cluster]);
+  }, [activeCluster?.context]);
 
   useEffect(() => {
     fetchData();
-    
+
     // Refresh metrics every 15 seconds
     const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  // Refetch when refreshTrigger changes (cluster switch)
+  useEffect(() => {
+    if (autoRefreshOnClusterChange && refreshTrigger > 0) {
+      fetchData();
+    }
+  }, [refreshTrigger, autoRefreshOnClusterChange, fetchData]);
 
   return { data, isLoading, error, refetch: fetchData, isBackendConnected };
 }
 
 /**
  * Hook to fetch real pod metrics from metrics-server
+ * Automatically refreshes on cluster change
  */
-export function usePodMetrics(namespace?: string, cluster?: string): UseKubernetesState<Record<string, any>> {
+export function usePodMetrics(
+  namespace?: string,
+  options: UseKubernetesOptions = {}
+): UseKubernetesState<Record<string, any>> {
+  const { autoRefreshOnClusterChange = true } = options;
+  const { activeCluster, refreshTrigger } = useCluster();
+
   const [data, setData] = useState<Record<string, any>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -418,7 +510,10 @@ export function usePodMetrics(namespace?: string, cluster?: string): UseKubernet
       setIsBackendConnected(available);
 
       if (available) {
-        const metrics = await apiClient.getPodMetrics(namespace, cluster);
+        const metrics = await apiClient.getPodMetrics(
+          namespace,
+          activeCluster?.context
+        );
         setData(metrics);
       } else {
         setData({});
@@ -430,16 +525,22 @@ export function usePodMetrics(namespace?: string, cluster?: string): UseKubernet
     } finally {
       setIsLoading(false);
     }
-  }, [namespace, cluster]);
+  }, [namespace, activeCluster?.context]);
 
   useEffect(() => {
     fetchData();
-    
+
     // Refresh metrics every 15 seconds
     const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
   }, [fetchData]);
 
+  // Refetch when refreshTrigger changes (cluster switch)
+  useEffect(() => {
+    if (autoRefreshOnClusterChange && refreshTrigger > 0) {
+      fetchData();
+    }
+  }, [refreshTrigger, autoRefreshOnClusterChange, fetchData]);
+
   return { data, isLoading, error, refetch: fetchData, isBackendConnected };
 }
-

@@ -6,8 +6,13 @@ import { Server, Database, Box, Cloud, Cpu, Activity, HardDrive, RefreshCw, Wifi
 import { ResourceType, InfrastructureNode } from '../../types';
 import { Skeleton } from '../ui/Skeleton';
 import { useInfrastructure } from '../../hooks/useKubernetes';
+import { useCluster } from '../../contexts/ClusterContext';
 
 export const InfrastructureView: React.FC = () => {
+  // Get cluster info from context
+  const { activeCluster, isBackendConnected: ctxBackendConnected } = useCluster();
+  
+  // Real data - automatically refreshes on cluster change
   const { 
     data: realNodes, 
     isLoading: apiLoading, 
@@ -81,9 +86,16 @@ export const InfrastructureView: React.FC = () => {
           <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Infrastructure Map</h2>
           <div className="flex items-center gap-2 mt-1">
             {isBackendConnected ? (
-              <span className="flex items-center gap-1 text-xs text-emerald-500">
-                <Wifi size={12} /> Live Data
-              </span>
+              <>
+                <span className="flex items-center gap-1 text-xs text-emerald-500">
+                  <Wifi size={12} /> Live Data
+                </span>
+                {activeCluster && (
+                  <span className="text-xs text-slate-500">
+                    • {activeCluster.name}
+                  </span>
+                )}
+              </>
             ) : (
               <span className="flex items-center gap-1 text-xs text-amber-500">
                 <WifiOff size={12} /> Demo Mode

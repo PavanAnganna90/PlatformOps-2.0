@@ -25,11 +25,13 @@ router = APIRouter(prefix="/kubernetes")
 
 class SwitchContextRequest(BaseModel):
     """Request to switch Kubernetes context."""
+
     context: str
 
 
 class SwitchContextResponse(BaseModel):
     """Response from context switch."""
+
     success: bool
     context: str
     error: Optional[str] = None
@@ -44,24 +46,21 @@ class SwitchContextResponse(BaseModel):
 async def list_clusters() -> ClusterListResponse:
     """
     List all configured Kubernetes clusters.
-    
+
     Returns clusters from:
     - Default kubeconfig (~/.kube/config)
     - Environment-specified kubeconfigs (KUBECONFIG_*)
     - In-cluster config (when running in Kubernetes)
-    
+
     Returns:
         ClusterListResponse: List of clusters with active cluster indicator
     """
     service = get_kubernetes_service()
     clusters = service.get_clusters()
-    
+
     # Find active cluster
-    active = next(
-        (c.name for c in clusters if c.status.value == "connected"),
-        None
-    )
-    
+    active = next((c.name for c in clusters if c.status.value == "connected"), None)
+
     return ClusterListResponse(
         clusters=clusters,
         active_cluster=active,
@@ -77,20 +76,20 @@ async def list_clusters() -> ClusterListResponse:
 async def get_cluster(cluster_name: str) -> ClusterInfo:
     """
     Get details for a specific cluster.
-    
+
     Args:
         cluster_name: Name of the cluster
-        
+
     Returns:
         ClusterInfo: Cluster details
     """
     service = get_kubernetes_service()
     clusters = service.get_clusters()
-    
+
     for cluster in clusters:
         if cluster.name == cluster_name or cluster.context == cluster_name:
             return cluster
-    
+
     # Return a disconnected cluster if not found
     return ClusterInfo(
         name=cluster_name,
@@ -114,10 +113,10 @@ async def list_nodes(
 ) -> List[NodeInfo]:
     """
     List all nodes in a cluster.
-    
+
     Args:
         cluster: Optional cluster name
-        
+
     Returns:
         List of NodeInfo objects
     """
@@ -139,10 +138,10 @@ async def list_namespaces(
 ) -> List[NamespaceInfo]:
     """
     List all namespaces in a cluster.
-    
+
     Args:
         cluster: Optional cluster name
-        
+
     Returns:
         List of NamespaceInfo objects
     """
@@ -168,11 +167,11 @@ async def list_pods(
 ) -> List[PodInfo]:
     """
     List pods in a cluster.
-    
+
     Args:
         namespace: Optional namespace filter
         cluster: Optional cluster name
-        
+
     Returns:
         List of PodInfo objects
     """
@@ -195,11 +194,11 @@ async def list_namespace_pods(
 ) -> List[PodInfo]:
     """
     List pods in a specific namespace.
-    
+
     Args:
         namespace: Namespace name
         cluster: Optional cluster name
-        
+
     Returns:
         List of PodInfo objects
     """
@@ -211,6 +210,7 @@ async def list_namespace_pods(
 # Context Management
 # -------------------------------------------------------------------------
 
+
 @router.post(
     "/context",
     response_model=SwitchContextResponse,
@@ -220,18 +220,18 @@ async def list_namespace_pods(
 async def switch_context(request: SwitchContextRequest) -> SwitchContextResponse:
     """
     Switch to a different Kubernetes context.
-    
+
     This changes which cluster subsequent API calls will target.
-    
+
     Args:
         request: Contains the context name to switch to
-        
+
     Returns:
         SwitchContextResponse indicating success or failure
     """
     service = get_kubernetes_service()
     success, error = service.switch_context(request.context)
-    
+
     return SwitchContextResponse(
         success=success,
         context=request.context,
@@ -247,19 +247,20 @@ async def switch_context(request: SwitchContextRequest) -> SwitchContextResponse
 async def get_current_context() -> dict:
     """
     Get the currently active context.
-    
+
     Returns:
         Dict with current context name
     """
     service = get_kubernetes_service()
     context = service.get_current_context()
-    
+
     return {"context": context}
 
 
 # -------------------------------------------------------------------------
 # Metrics
 # -------------------------------------------------------------------------
+
 
 @router.get(
     "/metrics/nodes",
@@ -275,12 +276,12 @@ async def get_node_metrics(
 ) -> Dict[str, NodeMetrics]:
     """
     Get real-time metrics for all nodes.
-    
+
     Requires metrics-server to be installed in the cluster.
-    
+
     Args:
         cluster: Optional cluster name
-        
+
     Returns:
         Dict mapping node name to NodeMetrics
     """
@@ -305,16 +306,15 @@ async def get_pod_metrics(
 ) -> Dict[str, dict]:
     """
     Get real-time metrics for pods.
-    
+
     Requires metrics-server to be installed in the cluster.
-    
+
     Args:
         namespace: Optional namespace filter
         cluster: Optional cluster name
-        
+
     Returns:
         Dict mapping "namespace/pod_name" to metrics
     """
     service = get_kubernetes_service()
     return service.get_pod_metrics(namespace=namespace, cluster=cluster)
-

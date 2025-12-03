@@ -1,15 +1,23 @@
 /**
  * Cluster Context Provider
- * 
+ *
  * Provides app-wide state for:
  * - Current active cluster
  * - Cluster list
  * - Context switching
  * - Backend connection status
+ * - Refresh trigger for dependent components
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
-import { apiClient, ClusterInfo } from '../services/api';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  ReactNode,
+} from "react";
+import { apiClient, ClusterInfo } from "../services/api";
 
 // ============================================================================
 // Types
@@ -22,11 +30,22 @@ interface ClusterContextType {
   isLoading: boolean;
   error: string | null;
   isBackendConnected: boolean;
-  
+
+  /**
+   * Refresh trigger - increments when cluster changes.
+   * Components can use this in useEffect dependencies to refetch data.
+   */
+  refreshTrigger: number;
+
   // Actions
   setActiveCluster: (cluster: ClusterInfo) => Promise<void>;
   refreshClusters: () => Promise<void>;
   switchContext: (contextName: string) => Promise<boolean>;
+
+  /**
+   * Manually trigger a refresh for all dependent components
+   */
+  triggerRefresh: () => void;
 }
 
 // ============================================================================
@@ -43,12 +62,24 @@ interface ClusterProviderProps {
   children: ReactNode;
 }
 
-export const ClusterProvider: React.FC<ClusterProviderProps> = ({ children }) => {
+export const ClusterProvider: React.FC<ClusterProviderProps> = ({
+  children,
+}) => {
   const [clusters, setClusters] = useState<ClusterInfo[]>([]);
-  const [activeCluster, setActiveClusterState] = useState<ClusterInfo | null>(null);
+  const [activeCluster, setActiveClusterState] = useState<ClusterInfo | null>(
+    null
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isBackendConnected, setIsBackendConnected] = useState(false);
+  const [refreshTrigger, setRefreshTrigger] = useState(0);
+
+  /**
+   * Manually trigger a refresh for all dependent components
+   */
+  const triggerRefresh = useCallback(() => {
+    setRefreshTrigger((prev) => prev + 1);
+  }, []);
 
   /**
    * Fetch clusters from the backend
@@ -65,10 +96,10 @@ export const ClusterProvider: React.FC<ClusterProviderProps> = ({ children }) =>
       if (!available) {
         // Use demo cluster
         const demoCluster: ClusterInfo = {
-          name: 'Demo Cluster',
-          context: 'demo',
-          status: 'connected',
-          version: '1.28',
+          name: "Demo Cluster",
+          context: "demo",
+          status: "connected",
+          version: "1.28",
           node_count: 3,
           namespace_count: 8,
           pod_count: 24,
@@ -82,23 +113,25 @@ export const ClusterProvider: React.FC<ClusterProviderProps> = ({ children }) =>
       const response = await apiClient.listClusters();
       setClusters(response.clusters);
 
-      // Set active cluster
-      if (response.clusters.length > 0) {
+      // Set active cluster if not already set
+      if (response.clusters.length > 0 && !activeCluster) {
         // Find first connected cluster, or use first in list
-        const connected = response.clusters.find(c => c.status === 'connected');
+        const connected = response.clusters.find(
+          (c) => c.status === "connected"
+        );
         const active = connected || response.clusters[0];
         setActiveClusterState(active);
       }
     } catch (err) {
-      console.error('Failed to fetch clusters:', err);
-      setError(err instanceof Error ? err.message : 'Failed to fetch clusters');
-      
+      console.error("Failed to fetch clusters:", err);
+      setError(err instanceof Error ? err.message : "Failed to fetch clusters");
+
       // Fallback to demo
       const demoCluster: ClusterInfo = {
-        name: 'Demo Cluster',
-        context: 'demo',
-        status: 'connected',
-        version: '1.28',
+        name: "Demo Cluster",
+        context: "demo",
+        status: "connected",
+        version: "1.28",
         node_count: 3,
         namespace_count: 8,
         pod_count: 24,
@@ -108,58 +141,66 @@ export const ClusterProvider: React.FC<ClusterProviderProps> = ({ children }) =>
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [activeCluster]);
 
   /**
    * Switch to a different cluster context
    */
-  const switchContext = useCallback(async (contextName: string): Promise<boolean> => {
-    if (!isBackendConnected) {
-      console.log('Backend not connected, cannot switch context');
-      return false;
-    }
-
-    try {
-      // Call backend to switch context
-      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:8000'}/api/v1/kubernetes/context`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ context: contextName }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        // Refresh clusters to get updated data
-        await refreshClusters();
-        return true;
-      } else {
-        setError(data.error || 'Failed to switch context');
+  const switchContext = useCallback(
+    async (contextName: string): Promise<boolean> => {
+      if (!isBackendConnected) {
+        console.log("Backend not connected, cannot switch context");
         return false;
       }
-    } catch (err) {
-      console.error('Failed to switch context:', err);
-      setError(err instanceof Error ? err.message : 'Failed to switch context');
-      return false;
-    }
-  }, [isBackendConnected, refreshClusters]);
+
+      setIsLoading(true);
+
+      try {
+        // Call backend to switch context
+        const response = await apiClient.switchContext(contextName);
+
+        if (response.success) {
+          // Refresh clusters to get updated data
+          await refreshClusters();
+          // Trigger refresh for all dependent components
+          triggerRefresh();
+          return true;
+        } else {
+          setError(response.error || "Failed to switch context");
+          return false;
+        }
+      } catch (err) {
+        console.error("Failed to switch context:", err);
+        setError(
+          err instanceof Error ? err.message : "Failed to switch context"
+        );
+        return false;
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [isBackendConnected, refreshClusters, triggerRefresh]
+  );
 
   /**
-   * Set the active cluster (UI-only, doesn't switch backend context)
+   * Set the active cluster and switch backend context
    */
-  const setActiveCluster = useCallback(async (cluster: ClusterInfo) => {
-    // If backend is connected and cluster is different, switch context
-    if (isBackendConnected && cluster.context !== activeCluster?.context) {
-      const success = await switchContext(cluster.context);
-      if (success) {
+  const setActiveCluster = useCallback(
+    async (cluster: ClusterInfo) => {
+      // If backend is connected and cluster is different, switch context
+      if (isBackendConnected && cluster.context !== activeCluster?.context) {
+        const success = await switchContext(cluster.context);
+        if (success) {
+          setActiveClusterState(cluster);
+        }
+      } else {
         setActiveClusterState(cluster);
+        // Still trigger refresh even if just UI change
+        triggerRefresh();
       }
-    } else {
-      setActiveClusterState(cluster);
-    }
-  }, [isBackendConnected, activeCluster, switchContext]);
+    },
+    [isBackendConnected, activeCluster, switchContext, triggerRefresh]
+  );
 
   // Initial load
   useEffect(() => {
@@ -183,9 +224,11 @@ export const ClusterProvider: React.FC<ClusterProviderProps> = ({ children }) =>
     isLoading,
     error,
     isBackendConnected,
+    refreshTrigger,
     setActiveCluster,
     refreshClusters,
     switchContext,
+    triggerRefresh,
   };
 
   return (
@@ -201,13 +244,12 @@ export const ClusterProvider: React.FC<ClusterProviderProps> = ({ children }) =>
 
 export const useCluster = (): ClusterContextType => {
   const context = useContext(ClusterContext);
-  
+
   if (context === undefined) {
-    throw new Error('useCluster must be used within a ClusterProvider');
+    throw new Error("useCluster must be used within a ClusterProvider");
   }
-  
+
   return context;
 };
 
 export default ClusterContext;
-

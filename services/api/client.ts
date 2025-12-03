@@ -1,6 +1,6 @@
 /**
  * OpsSight API Client
- * 
+ *
  * Provides a type-safe interface to the OpsSight backend API.
  * Automatically handles:
  * - Base URL configuration
@@ -11,7 +11,7 @@
 
 // Types
 export interface HealthResponse {
-  status: 'healthy' | 'unhealthy';
+  status: "healthy" | "unhealthy";
   version: string;
   timestamp: string;
 }
@@ -24,13 +24,18 @@ export interface IntegrationStatus {
 }
 
 export interface ConfigStatusResponse {
-  mode: 'local' | 'docker' | 'kubernetes';
+  mode: "local" | "docker" | "kubernetes";
   integrations: Record<string, boolean>;
   details: IntegrationStatus[];
 }
 
-export type ClusterStatus = 'connected' | 'disconnected' | 'error' | 'unknown';
-export type ResourceStatus = 'healthy' | 'warning' | 'error' | 'pending' | 'unknown';
+export type ClusterStatus = "connected" | "disconnected" | "error" | "unknown";
+export type ResourceStatus =
+  | "healthy"
+  | "warning"
+  | "error"
+  | "pending"
+  | "unknown";
 
 export interface ClusterInfo {
   name: string;
@@ -87,7 +92,7 @@ export interface ContainerStatus {
 export interface PodInfo {
   name: string;
   namespace: string;
-  phase: 'Pending' | 'Running' | 'Succeeded' | 'Failed' | 'Unknown';
+  phase: "Pending" | "Running" | "Succeeded" | "Failed" | "Unknown";
   status: ResourceStatus;
   node_name?: string;
   pod_ip?: string;
@@ -132,12 +137,12 @@ const getApiUrl = (): string => {
   if (envUrl) {
     return envUrl;
   }
-  
+
   // Default to localhost in development
   if (import.meta.env.DEV) {
-    return 'http://localhost:8000';
+    return "http://localhost:8000";
   }
-  
+
   // In production, assume API is on same host
   return window.location.origin;
 };
@@ -165,7 +170,7 @@ class ApiClient {
 
     try {
       const response = await fetch(`${this.baseUrl}/api/v1/health`, {
-        method: 'GET',
+        method: "GET",
         signal: AbortSignal.timeout(3000), // 3 second timeout
       });
       this.isBackendAvailable = response.ok;
@@ -191,18 +196,18 @@ class ApiClient {
     options: RequestInit = {}
   ): Promise<T> {
     const url = `${this.baseUrl}${endpoint}`;
-    
+
     const response = await fetch(url, {
       ...options,
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
         ...options.headers,
       },
     });
 
     if (!response.ok) {
       const error: ApiError = await response.json().catch(() => ({
-        error: 'UnknownError',
+        error: "UnknownError",
         message: `HTTP ${response.status}: ${response.statusText}`,
       }));
       throw new Error(error.message);
@@ -219,21 +224,21 @@ class ApiClient {
    * Get API health status
    */
   async getHealth(): Promise<HealthResponse> {
-    return this.request<HealthResponse>('/api/v1/health');
+    return this.request<HealthResponse>("/api/v1/health");
   }
 
   /**
    * Get configuration status
    */
   async getConfigStatus(): Promise<ConfigStatusResponse> {
-    return this.request<ConfigStatusResponse>('/api/v1/config/status');
+    return this.request<ConfigStatusResponse>("/api/v1/config/status");
   }
 
   /**
    * Get integration details
    */
   async getIntegrations(): Promise<IntegrationStatus[]> {
-    return this.request<IntegrationStatus[]>('/api/v1/config/integrations');
+    return this.request<IntegrationStatus[]>("/api/v1/config/integrations");
   }
 
   // -------------------------------------------------------------------------
@@ -244,7 +249,7 @@ class ApiClient {
    * List all Kubernetes clusters
    */
   async listClusters(): Promise<ClusterListResponse> {
-    return this.request<ClusterListResponse>('/api/v1/kubernetes/clusters');
+    return this.request<ClusterListResponse>("/api/v1/kubernetes/clusters");
   }
 
   /**
@@ -260,7 +265,7 @@ class ApiClient {
    * List nodes in a cluster
    */
   async listNodes(cluster?: string): Promise<NodeInfo[]> {
-    const params = cluster ? `?cluster=${encodeURIComponent(cluster)}` : '';
+    const params = cluster ? `?cluster=${encodeURIComponent(cluster)}` : "";
     return this.request<NodeInfo[]>(`/api/v1/kubernetes/nodes${params}`);
   }
 
@@ -268,8 +273,10 @@ class ApiClient {
    * List namespaces in a cluster
    */
   async listNamespaces(cluster?: string): Promise<NamespaceInfo[]> {
-    const params = cluster ? `?cluster=${encodeURIComponent(cluster)}` : '';
-    return this.request<NamespaceInfo[]>(`/api/v1/kubernetes/namespaces${params}`);
+    const params = cluster ? `?cluster=${encodeURIComponent(cluster)}` : "";
+    return this.request<NamespaceInfo[]>(
+      `/api/v1/kubernetes/namespaces${params}`
+    );
   }
 
   /**
@@ -277,11 +284,11 @@ class ApiClient {
    */
   async listPods(namespace?: string, cluster?: string): Promise<PodInfo[]> {
     const params = new URLSearchParams();
-    if (namespace) params.set('namespace', namespace);
-    if (cluster) params.set('cluster', cluster);
+    if (namespace) params.set("namespace", namespace);
+    if (cluster) params.set("cluster", cluster);
     const queryString = params.toString();
     return this.request<PodInfo[]>(
-      `/api/v1/kubernetes/pods${queryString ? `?${queryString}` : ''}`
+      `/api/v1/kubernetes/pods${queryString ? `?${queryString}` : ""}`
     );
   }
 
@@ -293,8 +300,8 @@ class ApiClient {
    * Switch Kubernetes context
    */
   async switchContext(context: string): Promise<SwitchContextResponse> {
-    return this.request<SwitchContextResponse>('/api/v1/kubernetes/context', {
-      method: 'POST',
+    return this.request<SwitchContextResponse>("/api/v1/kubernetes/context", {
+      method: "POST",
       body: JSON.stringify({ context }),
     });
   }
@@ -303,7 +310,9 @@ class ApiClient {
    * Get current context
    */
   async getCurrentContext(): Promise<{ context: string | null }> {
-    return this.request<{ context: string | null }>('/api/v1/kubernetes/context');
+    return this.request<{ context: string | null }>(
+      "/api/v1/kubernetes/context"
+    );
   }
 
   // -------------------------------------------------------------------------
@@ -314,20 +323,25 @@ class ApiClient {
    * Get node metrics from metrics-server
    */
   async getNodeMetrics(cluster?: string): Promise<Record<string, NodeMetrics>> {
-    const params = cluster ? `?cluster=${encodeURIComponent(cluster)}` : '';
-    return this.request<Record<string, NodeMetrics>>(`/api/v1/kubernetes/metrics/nodes${params}`);
+    const params = cluster ? `?cluster=${encodeURIComponent(cluster)}` : "";
+    return this.request<Record<string, NodeMetrics>>(
+      `/api/v1/kubernetes/metrics/nodes${params}`
+    );
   }
 
   /**
    * Get pod metrics from metrics-server
    */
-  async getPodMetrics(namespace?: string, cluster?: string): Promise<Record<string, PodMetrics>> {
+  async getPodMetrics(
+    namespace?: string,
+    cluster?: string
+  ): Promise<Record<string, PodMetrics>> {
     const params = new URLSearchParams();
-    if (namespace) params.set('namespace', namespace);
-    if (cluster) params.set('cluster', cluster);
+    if (namespace) params.set("namespace", namespace);
+    if (cluster) params.set("cluster", cluster);
     const queryString = params.toString();
     return this.request<Record<string, PodMetrics>>(
-      `/api/v1/kubernetes/metrics/pods${queryString ? `?${queryString}` : ''}`
+      `/api/v1/kubernetes/metrics/pods${queryString ? `?${queryString}` : ""}`
     );
   }
 }
@@ -337,4 +351,3 @@ export const apiClient = new ApiClient();
 
 // Export class for testing or custom instances
 export { ApiClient };
-

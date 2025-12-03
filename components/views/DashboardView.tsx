@@ -5,14 +5,17 @@ import { storage } from '../../services/storage';
 import { simulation } from '../../services/simulation';
 import { Status, ChaosType } from '../../types';
 import { ArrowUpRight, Activity, Terminal, Skull, MoreHorizontal, TrendingUp, Server, Box, Wifi, WifiOff } from 'lucide-react';
-import { useClusters, useNodes, usePods } from '../../hooks/useKubernetes';
+import { useNodes, usePods } from '../../hooks/useKubernetes';
+import { useCluster } from '../../contexts/ClusterContext';
 
 export const DashboardView: React.FC = () => {
   const [_, setTick] = useState(0);
   const [isSimRunning, setIsSimRunning] = useState(false);
   
-  // Real data from backend
-  const { data: clusters, isBackendConnected } = useClusters();
+  // Get active cluster from context
+  const { activeCluster, isBackendConnected } = useCluster();
+  
+  // Real data from backend - automatically refreshes on cluster change
   const { data: realNodes } = useNodes();
   const { data: realPods } = usePods();
   
@@ -22,7 +25,6 @@ export const DashboardView: React.FC = () => {
   const dora = storage.getDoraMetrics();
   
   // Calculate real cluster stats
-  const activeCluster = clusters.find(c => c.status === 'connected');
   const totalNodes = isBackendConnected ? realNodes.length : nodes.length;
   const totalPods = isBackendConnected ? realPods.length : 24;
   const healthyPods = isBackendConnected 
