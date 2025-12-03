@@ -4,15 +4,33 @@ import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { storage } from '../../services/storage';
 import { simulation } from '../../services/simulation';
 import { Status, ChaosType } from '../../types';
-import { ArrowUpRight, Activity, Terminal, Skull, MoreHorizontal, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, Activity, Terminal, Skull, MoreHorizontal, TrendingUp, Server, Box, Wifi, WifiOff } from 'lucide-react';
+import { useClusters, useNodes, usePods } from '../../hooks/useKubernetes';
 
 export const DashboardView: React.FC = () => {
   const [_, setTick] = useState(0);
   const [isSimRunning, setIsSimRunning] = useState(false);
   
+  // Real data from backend
+  const { data: clusters, isBackendConnected } = useClusters();
+  const { data: realNodes } = useNodes();
+  const { data: realPods } = usePods();
+  
+  // Simulated data for demo mode
   const nodes = storage.getNodes();
   const logs = storage.getLogs().slice(0, 50);
   const dora = storage.getDoraMetrics();
+  
+  // Calculate real cluster stats
+  const activeCluster = clusters.find(c => c.status === 'connected');
+  const totalNodes = isBackendConnected ? realNodes.length : nodes.length;
+  const totalPods = isBackendConnected ? realPods.length : 24;
+  const healthyPods = isBackendConnected 
+    ? realPods.filter(p => p.phase === 'Running' && p.restart_count < 5).length 
+    : 22;
+  const warningPods = isBackendConnected 
+    ? realPods.filter(p => p.restart_count >= 5 || p.phase === 'Pending').length 
+    : 2;
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -74,6 +92,57 @@ export const DashboardView: React.FC = () => {
            </div>
         </div>
       </div>
+
+      {/* Cluster Summary - Real Data */}
+      {isBackendConnected && activeCluster && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-white dark:bg-[#0F1115] border border-slate-200 dark:border-white/5 rounded-2xl p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-primary/10 rounded-lg">
+                <Server size={18} className="text-primary" />
+              </div>
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Nodes</span>
+            </div>
+            <div className="text-3xl font-bold text-slate-900 dark:text-white">{totalNodes}</div>
+            <div className="text-xs text-emerald-500 mt-1">All healthy</div>
+          </div>
+          
+          <div className="bg-white dark:bg-[#0F1115] border border-slate-200 dark:border-white/5 rounded-2xl p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-accent/10 rounded-lg">
+                <Box size={18} className="text-accent" />
+              </div>
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Pods</span>
+            </div>
+            <div className="text-3xl font-bold text-slate-900 dark:text-white">{totalPods}</div>
+            <div className="text-xs text-slate-500 mt-1">{healthyPods} running</div>
+          </div>
+          
+          <div className="bg-white dark:bg-[#0F1115] border border-slate-200 dark:border-white/5 rounded-2xl p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-emerald-500/10 rounded-lg">
+                <Wifi size={18} className="text-emerald-500" />
+              </div>
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Cluster</span>
+            </div>
+            <div className="text-xl font-bold text-slate-900 dark:text-white truncate">{activeCluster.name}</div>
+            <div className="text-xs text-emerald-500 mt-1">v{activeCluster.version}</div>
+          </div>
+          
+          <div className="bg-white dark:bg-[#0F1115] border border-slate-200 dark:border-white/5 rounded-2xl p-5">
+            <div className="flex items-center gap-3 mb-2">
+              <div className={`p-2 rounded-lg ${warningPods > 0 ? 'bg-amber-500/10' : 'bg-emerald-500/10'}`}>
+                <Activity size={18} className={warningPods > 0 ? 'text-amber-500' : 'text-emerald-500'} />
+              </div>
+              <span className="text-xs text-slate-500 uppercase tracking-wider">Issues</span>
+            </div>
+            <div className={`text-3xl font-bold ${warningPods > 0 ? 'text-amber-500' : 'text-emerald-500'}`}>
+              {warningPods}
+            </div>
+            <div className="text-xs text-slate-500 mt-1">pods need attention</div>
+          </div>
+        </div>
+      )}
 
       {/* Top Assets (DORA Metrics as Crypto Cards) */}
       <div>
@@ -172,34 +241,67 @@ export const DashboardView: React.FC = () => {
           </Card>
         </div>
 
-        {/* Side Panel: Active "Stakings" (Nodes) */}
+        {/* Side Panel: Active Nodes - Real or Simulated */}
         <Card className="flex flex-col h-[450px]">
           <div className="flex justify-between items-center mb-6">
-             <h3 className="font-bold text-slate-900 dark:text-white">Active Nodes</h3>
+             <div className="flex items-center gap-2">
+               <h3 className="font-bold text-slate-900 dark:text-white">Active Nodes</h3>
+               {isBackendConnected ? (
+                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20">Live</span>
+               ) : (
+                 <span className="text-[10px] px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-500 border border-amber-500/20">Demo</span>
+               )}
+             </div>
              <button className="p-2 hover:bg-slate-100 dark:hover:bg-white/5 rounded-lg text-slate-400"><MoreHorizontal size={18} /></button>
           </div>
 
           <div className="flex-1 overflow-y-auto pr-2 space-y-3 custom-scrollbar">
-            {nodes.map(node => (
-               <div key={node.id} className="group p-3 rounded-2xl bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-white/5 hover:border-primary/50 dark:hover:border-white/10 transition-all flex items-center justify-between">
+            {/* Show real nodes if backend connected, otherwise simulated */}
+            {isBackendConnected && realNodes.length > 0 ? (
+              realNodes.map(node => (
+                <div key={node.name} className="group p-3 rounded-2xl bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-white/5 hover:border-primary/50 dark:hover:border-white/10 transition-all flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                       node.status === 'healthy' ? 'bg-emerald-500/10 text-emerald-500' :
-                       node.status === 'error' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'
-                     }`}>
-                        <TrendingUp size={18} />
-                     </div>
-                     <div>
-                        <div className="text-sm font-semibold text-slate-900 dark:text-white">{node.name}</div>
-                        <div className="text-[10px] text-slate-500 font-mono uppercase">{node.type}</div>
-                     </div>
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      node.status === 'healthy' ? 'bg-emerald-500/10 text-emerald-500' :
+                      node.status === 'error' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'
+                    }`}>
+                      <Server size={18} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white truncate max-w-[120px]">{node.name}</div>
+                      <div className="text-[10px] text-slate-500 font-mono uppercase">{node.role}</div>
+                    </div>
                   </div>
                   <div className="text-right">
-                     <div className="text-sm font-mono text-slate-700 dark:text-white">{node.metrics.cpu}%</div>
-                     <div className="text-[10px] text-slate-500">CPU Usage</div>
+                    <div className="text-sm font-mono text-slate-700 dark:text-white">
+                      {node.metrics?.cpu_usage_percent?.toFixed(0) ?? '--'}%
+                    </div>
+                    <div className="text-[10px] text-slate-500">CPU</div>
                   </div>
-               </div>
-            ))}
+                </div>
+              ))
+            ) : (
+              nodes.map(node => (
+                <div key={node.id} className="group p-3 rounded-2xl bg-slate-50 dark:bg-[#0F1115] border border-slate-200 dark:border-white/5 hover:border-primary/50 dark:hover:border-white/10 transition-all flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                      node.status === 'healthy' ? 'bg-emerald-500/10 text-emerald-500' :
+                      node.status === 'error' ? 'bg-red-500/10 text-red-500' : 'bg-amber-500/10 text-amber-500'
+                    }`}>
+                      <TrendingUp size={18} />
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-slate-900 dark:text-white">{node.name}</div>
+                      <div className="text-[10px] text-slate-500 font-mono uppercase">{node.type}</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-sm font-mono text-slate-700 dark:text-white">{node.metrics.cpu}%</div>
+                    <div className="text-[10px] text-slate-500">CPU Usage</div>
+                  </div>
+                </div>
+              ))
+            )}
           </div>
           
           <div className="mt-4 pt-4 border-t border-slate-200 dark:border-white/5">
