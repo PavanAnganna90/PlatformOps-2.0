@@ -16,10 +16,26 @@ import { simulation } from './services/simulation';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ClusterProvider } from './contexts/ClusterContext';
 import { EnvironmentSelector } from './components/ui/EnvironmentSelector';
+import { OnboardingModal } from './components/ui/OnboardingModal';
+import { SettingsModal } from './components/ui/SettingsModal';
 
 const MainLayout: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const { user, loading, isDemoMode, theme, toggleTheme } = useAuth();
+
+  // Check if onboarding has been completed
+  useEffect(() => {
+    const onboardingComplete = localStorage.getItem('opssight_onboarding_complete');
+    if (!onboardingComplete && user) {
+      // Show onboarding after a short delay
+      const timer = setTimeout(() => {
+        setShowOnboarding(true);
+      }, 1000);
+      return () => clearTimeout(timer);
+    }
+  }, [user]);
 
   useEffect(() => {
     // Only run simulation if we are in demo mode
@@ -109,7 +125,11 @@ const MainLayout: React.FC = () => {
               {theme === 'dark' ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
             </button>
             
-            <button className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors">
+            <button 
+              onClick={() => setShowSettings(true)}
+              className="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-white transition-colors"
+              title="Settings & Integrations"
+            >
               <Settings className="w-5 h-5" />
             </button>
             
@@ -146,6 +166,22 @@ const MainLayout: React.FC = () => {
 
         <GeminiAssistant />
       </main>
+
+      {/* Onboarding Modal */}
+      <OnboardingModal
+        isOpen={showOnboarding}
+        onComplete={() => setShowOnboarding(false)}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        isOpen={showSettings}
+        onClose={() => setShowSettings(false)}
+        onSave={() => {
+          // Refresh data after saving credentials
+          window.location.reload();
+        }}
+      />
     </div>
   );
 };

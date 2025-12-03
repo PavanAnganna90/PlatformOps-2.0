@@ -159,6 +159,11 @@ class Settings(BaseSettings):
     azure_client_secret: Optional[str] = Field(default=None, alias="AZURE_CLIENT_SECRET")
     azure_tenant_id: Optional[str] = Field(default=None, alias="AZURE_TENANT_ID")
 
+    # Datadog
+    datadog_api_key: Optional[str] = Field(default=None, alias="DATADOG_API_KEY")
+    datadog_app_key: Optional[str] = Field(default=None, alias="DATADOG_APP_KEY")
+    datadog_site: Optional[str] = Field(default="datadoghq.com", alias="DATADOG_SITE")
+
     # -------------------------------------------------------------------------
     # Observability
     # -------------------------------------------------------------------------
@@ -189,6 +194,7 @@ class Settings(BaseSettings):
                 and self.azure_client_secret
                 and self.azure_tenant_id
             ),
+            "datadog": bool(self.datadog_api_key and self.datadog_app_key),
         }
 
 

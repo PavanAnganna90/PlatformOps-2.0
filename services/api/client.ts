@@ -495,11 +495,14 @@ class ApiClient {
     options?: { resourceType?: string; region?: string }
   ): Promise<CloudResourcesResponse> {
     const params = new URLSearchParams();
-    if (options?.resourceType) params.set("resource_type", options.resourceType);
+    if (options?.resourceType)
+      params.set("resource_type", options.resourceType);
     if (options?.region) params.set("region", options.region);
     const queryString = params.toString();
     return this.request<CloudResourcesResponse>(
-      `/api/v1/cloud/${provider}/resources${queryString ? `?${queryString}` : ""}`
+      `/api/v1/cloud/${provider}/resources${
+        queryString ? `?${queryString}` : ""
+      }`
     );
   }
 
@@ -512,6 +515,85 @@ class ApiClient {
     message: string;
   }> {
     return this.request(`/api/v1/cloud/${provider}/status`);
+  }
+
+  // -------------------------------------------------------------------------
+  // Settings & Credentials
+  // -------------------------------------------------------------------------
+
+  /**
+   * Get integration status
+   */
+  async getIntegrationStatus(): Promise<{
+    integrations: Record<string, boolean>;
+    details: Array<{
+      name: string;
+      configured: boolean;
+      message: string;
+    }>;
+    total_configured: number;
+    total_integrations: number;
+  }> {
+    return this.request("/api/v1/settings/status");
+  }
+
+  /**
+   * Get credentials status (without exposing values)
+   */
+  async getCredentialsStatus(): Promise<{
+    cloud: {
+      aws?: { configured: boolean; region?: string };
+      gcp?: { configured: boolean; project_id?: string };
+      azure?: { configured: boolean };
+    };
+    integrations: {
+      github?: { configured: boolean };
+      argocd?: { configured: boolean; url?: string };
+      prometheus?: { configured: boolean; url?: string };
+      datadog?: { configured: boolean };
+      terraform_cloud?: { configured: boolean; org?: string };
+    };
+  }> {
+    return this.request("/api/v1/settings/credentials");
+  }
+
+  /**
+   * Save credentials
+   */
+  async saveCredentials(credentials: {
+    cloud?: {
+      aws_access_key_id?: string;
+      aws_secret_access_key?: string;
+      aws_region?: string;
+      gcp_project_id?: string;
+      gcp_credentials_path?: string;
+      azure_subscription_id?: string;
+      azure_client_id?: string;
+      azure_client_secret?: string;
+      azure_tenant_id?: string;
+    };
+    integrations?: {
+      github_token?: string;
+      github_org?: string;
+      argocd_url?: string;
+      argocd_token?: string;
+      prometheus_url?: string;
+      datadog_api_key?: string;
+      datadog_app_key?: string;
+      datadog_site?: string;
+      tfc_token?: string;
+      tfc_org?: string;
+    };
+  }): Promise<{
+    success: boolean;
+    message: string;
+    saved: Record<string, any>;
+    note?: string;
+  }> {
+    return this.request("/api/v1/settings/credentials", {
+      method: "POST",
+      body: JSON.stringify(credentials),
+    });
   }
 
   // -------------------------------------------------------------------------
