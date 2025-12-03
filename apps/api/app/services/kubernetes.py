@@ -848,6 +848,319 @@ class KubernetesService:
             ),
         ]
 
+    # -------------------------------------------------------------------------
+    # Deployment Management
+    # -------------------------------------------------------------------------
+
+    def list_deployments(
+        self,
+        namespace: Optional[str] = None,
+        cluster: Optional[str] = None,
+    ) -> List[dict]:
+        """
+        List all deployments.
+
+        Args:
+            namespace: Filter by namespace
+            cluster: Cluster context name
+
+        Returns:
+            List of deployment info dicts
+        """
+        success, error = self._load_kubeconfig()
+        if not success:
+            return self._get_demo_deployments(namespace)
+
+        try:
+            apps_v1 = self._k8s_client.AppsV1Api()
+
+            if namespace:
+                deployments = apps_v1.list_namespaced_deployment(namespace=namespace)
+            else:
+                deployments = apps_v1.list_deployment_for_all_namespaces()
+
+            result = []
+            for dep in deployments.items:
+                spec = dep.spec
+                status = dep.status
+
+                # Get container image
+                image = "unknown"
+                if spec.template.spec.containers:
+                    image = spec.template.spec.containers[0].image
+
+                result.append({
+                    "name": dep.metadata.name,
+                    "namespace": dep.metadata.namespace,
+                    "replicas": spec.replicas or 0,
+                    "available_replicas": status.available_replicas or 0,
+                    "ready_replicas": status.ready_replicas or 0,
+                    "updated_replicas": status.updated_replicas or 0,
+                    "image": image,
+                    "strategy": spec.strategy.type if spec.strategy else "RollingUpdate",
+                })
+
+            return result
+
+        except Exception as e:
+            logger.error(f"Failed to list deployments: {e}")
+            return self._get_demo_deployments(namespace)
+
+    def scale_deployment(
+        self,
+        namespace: str,
+        name: str,
+        replicas: int,
+        cluster: Optional[str] = None,
+    ) -> dict:
+        """
+        Scale a deployment.
+
+        Args:
+            namespace: Deployment namespace
+            name: Deployment name
+            replicas: Desired replica count
+            cluster: Cluster context name
+
+        Returns:
+            Dict with operation result
+        """
+        success, error = self._load_kubeconfig()
+        if not success:
+            return {
+                "success": True,
+                "namespace": namespace,
+                "deployment": name,
+                "previous_replicas": 3,
+                "current_replicas": replicas,
+                "message": "Demo mode - scale simulated",
+            }
+
+        try:
+            apps_v1 = self._k8s_client.AppsV1Api()
+
+            # Get current deployment
+            deployment = apps_v1.read_namespaced_deployment(name=name, namespace=namespace)
+            previous_replicas = deployment.spec.replicas or 0
+
+            # Patch the deployment
+            body = {"spec": {"replicas": replicas}}
+            apps_v1.patch_namespaced_deployment(
+                name=name,
+                namespace=namespace,
+                body=body,
+            )
+
+            return {
+                "success": True,
+                "namespace": namespace,
+                "deployment": name,
+                "previous_replicas": previous_replicas,
+                "current_replicas": replicas,
+                "message": f"Scaled from {previous_replicas} to {replicas} replicas",
+            }
+
+        except self._k8s_client.ApiException as e:
+            logger.error(f"Failed to scale deployment {namespace}/{name}: {e}")
+            return {
+                "success": False,
+                "namespace": namespace,
+                "deployment": name,
+                "previous_replicas": 0,
+                "current_replicas": 0,
+                "message": f"API error: {e.reason}",
+            }
+        except Exception as e:
+            logger.error(f"Failed to scale deployment: {e}")
+            return {
+                "success": False,
+                "namespace": namespace,
+                "deployment": name,
+                "previous_replicas": 0,
+                "current_replicas": 0,
+                "message": str(e),
+            }
+
+    def restart_deployment(
+        self,
+        namespace: str,
+        name: str,
+        cluster: Optional[str] = None,
+    ) -> dict:
+        """
+        Restart a deployment by patching the pod template.
+
+        Args:
+            namespace: Deployment namespace
+            name: Deployment name
+            cluster: Cluster context name
+
+        Returns:
+            Dict with operation result
+        """
+        success, error = self._load_kubeconfig()
+        if not success:
+            return {
+                "success": True,
+                "namespace": namespace,
+                "deployment": name,
+                "message": "Demo mode - restart simulated",
+            }
+
+        try:
+            apps_v1 = self._k8s_client.AppsV1Api()
+
+            # Patch with restart annotation
+            now = datetime.now(timezone.utc).isoformat()
+            body = {
+                "spec": {
+                    "template": {
+                        "metadata": {
+                            "annotations": {
+                                "kubectl.kubernetes.io/restartedAt": now
+                            }
+                        }
+                    }
+                }
+            }
+
+            apps_v1.patch_namespaced_deployment(
+                name=name,
+                namespace=namespace,
+                body=body,
+            )
+
+            return {
+                "success": True,
+                "namespace": namespace,
+                "deployment": name,
+                "message": f"Deployment restart initiated at {now}",
+            }
+
+        except self._k8s_client.ApiException as e:
+            logger.error(f"Failed to restart deployment {namespace}/{name}: {e}")
+            return {
+                "success": False,
+                "namespace": namespace,
+                "deployment": name,
+                "message": f"API error: {e.reason}",
+            }
+        except Exception as e:
+            logger.error(f"Failed to restart deployment: {e}")
+            return {
+                "success": False,
+                "namespace": namespace,
+                "deployment": name,
+                "message": str(e),
+            }
+
+    def delete_pod(
+        self,
+        namespace: str,
+        name: str,
+        cluster: Optional[str] = None,
+    ) -> dict:
+        """
+        Delete a pod.
+
+        Args:
+            namespace: Pod namespace
+            name: Pod name
+            cluster: Cluster context name
+
+        Returns:
+            Dict with operation result
+        """
+        success, error = self._load_kubeconfig()
+        if not success:
+            return {
+                "success": True,
+                "namespace": namespace,
+                "pod": name,
+                "message": "Demo mode - delete simulated",
+            }
+
+        try:
+            core_v1 = self._k8s_client.CoreV1Api()
+
+            core_v1.delete_namespaced_pod(
+                name=name,
+                namespace=namespace,
+            )
+
+            return {
+                "success": True,
+                "namespace": namespace,
+                "pod": name,
+                "message": f"Pod {name} deleted successfully",
+            }
+
+        except self._k8s_client.ApiException as e:
+            logger.error(f"Failed to delete pod {namespace}/{name}: {e}")
+            return {
+                "success": False,
+                "namespace": namespace,
+                "pod": name,
+                "message": f"API error: {e.reason}",
+            }
+        except Exception as e:
+            logger.error(f"Failed to delete pod: {e}")
+            return {
+                "success": False,
+                "namespace": namespace,
+                "pod": name,
+                "message": str(e),
+            }
+
+    def _get_demo_deployments(self, namespace: Optional[str] = None) -> List[dict]:
+        """Return demo deployment data."""
+        deployments = [
+            {
+                "name": "frontend",
+                "namespace": "default",
+                "replicas": 3,
+                "available_replicas": 3,
+                "ready_replicas": 3,
+                "updated_replicas": 3,
+                "image": "myapp/frontend:v2.1.0",
+                "strategy": "RollingUpdate",
+            },
+            {
+                "name": "backend-api",
+                "namespace": "backend",
+                "replicas": 5,
+                "available_replicas": 5,
+                "ready_replicas": 5,
+                "updated_replicas": 5,
+                "image": "myapp/api:v1.8.3",
+                "strategy": "RollingUpdate",
+            },
+            {
+                "name": "worker",
+                "namespace": "backend",
+                "replicas": 2,
+                "available_replicas": 2,
+                "ready_replicas": 2,
+                "updated_replicas": 2,
+                "image": "myapp/worker:v1.4.0",
+                "strategy": "RollingUpdate",
+            },
+            {
+                "name": "prometheus",
+                "namespace": "monitoring",
+                "replicas": 1,
+                "available_replicas": 1,
+                "ready_replicas": 1,
+                "updated_replicas": 1,
+                "image": "prom/prometheus:v2.45.0",
+                "strategy": "Recreate",
+            },
+        ]
+
+        if namespace:
+            return [d for d in deployments if d["namespace"] == namespace]
+        return deployments
+
 
 # Singleton instance
 _kubernetes_service: Optional[KubernetesService] = None

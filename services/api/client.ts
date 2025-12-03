@@ -344,6 +344,269 @@ class ApiClient {
       `/api/v1/kubernetes/metrics/pods${queryString ? `?${queryString}` : ""}`
     );
   }
+
+  // -------------------------------------------------------------------------
+  // Deployments
+  // -------------------------------------------------------------------------
+
+  /**
+   * List deployments
+   */
+  async listDeployments(
+    namespace?: string,
+    cluster?: string
+  ): Promise<DeploymentInfo[]> {
+    const params = new URLSearchParams();
+    if (namespace) params.set("namespace", namespace);
+    if (cluster) params.set("cluster", cluster);
+    const queryString = params.toString();
+    return this.request<DeploymentInfo[]>(
+      `/api/v1/kubernetes/deployments${queryString ? `?${queryString}` : ""}`
+    );
+  }
+
+  /**
+   * Scale a deployment
+   */
+  async scaleDeployment(
+    namespace: string,
+    name: string,
+    replicas: number
+  ): Promise<ScaleResponse> {
+    return this.request<ScaleResponse>(
+      `/api/v1/kubernetes/deployments/${namespace}/${name}/scale`,
+      {
+        method: "POST",
+        body: JSON.stringify({ replicas }),
+      }
+    );
+  }
+
+  /**
+   * Restart a deployment
+   */
+  async restartDeployment(
+    namespace: string,
+    name: string
+  ): Promise<RestartResponse> {
+    return this.request<RestartResponse>(
+      `/api/v1/kubernetes/deployments/${namespace}/${name}/restart`,
+      { method: "POST" }
+    );
+  }
+
+  /**
+   * Delete a pod
+   */
+  async deletePod(namespace: string, name: string): Promise<{ success: boolean; message?: string }> {
+    return this.request<{ success: boolean; message?: string }>(
+      `/api/v1/kubernetes/pods/${namespace}/${name}`,
+      { method: "DELETE" }
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // GitHub Actions
+  // -------------------------------------------------------------------------
+
+  /**
+   * List GitHub workflow runs
+   */
+  async listWorkflowRuns(
+    owner: string,
+    repo: string,
+    options?: { branch?: string; status?: string; perPage?: number }
+  ): Promise<WorkflowRunsResponse> {
+    const params = new URLSearchParams();
+    params.set("owner", owner);
+    params.set("repo", repo);
+    if (options?.branch) params.set("branch", options.branch);
+    if (options?.status) params.set("status", options.status);
+    if (options?.perPage) params.set("per_page", options.perPage.toString());
+    return this.request<WorkflowRunsResponse>(
+      `/api/v1/integrations/github/workflows?${params.toString()}`
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // ArgoCD
+  // -------------------------------------------------------------------------
+
+  /**
+   * List ArgoCD applications
+   */
+  async listArgoApplications(project?: string): Promise<ArgoApplicationsResponse> {
+    const params = project ? `?project=${encodeURIComponent(project)}` : "";
+    return this.request<ArgoApplicationsResponse>(
+      `/api/v1/integrations/argocd/applications${params}`
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Prometheus
+  // -------------------------------------------------------------------------
+
+  /**
+   * Get cluster metrics from Prometheus
+   */
+  async getClusterMetrics(cluster?: string): Promise<ClusterMetricsResponse> {
+    const params = cluster ? `?cluster=${encodeURIComponent(cluster)}` : "";
+    return this.request<ClusterMetricsResponse>(
+      `/api/v1/integrations/prometheus/cluster${params}`
+    );
+  }
+
+  /**
+   * Query Prometheus
+   */
+  async queryPrometheus(
+    query: string,
+    hours?: number
+  ): Promise<PrometheusQueryResponse> {
+    const params = new URLSearchParams();
+    params.set("query", query);
+    if (hours) params.set("hours", hours.toString());
+    return this.request<PrometheusQueryResponse>(
+      `/api/v1/integrations/prometheus/query_range?${params.toString()}`
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // WebSocket
+  // -------------------------------------------------------------------------
+
+  /**
+   * Get WebSocket URL for pod logs
+   */
+  getLogStreamUrl(namespace: string, pod: string, container?: string): string {
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const baseUrl = this.baseUrl.replace(/^https?:/, wsProtocol);
+    let url = `${baseUrl}/api/v1/ws/logs/${namespace}/${pod}`;
+    if (container) url += `?container=${encodeURIComponent(container)}`;
+    return url;
+  }
+
+  /**
+   * Get WebSocket URL for metrics stream
+   */
+  getMetricsStreamUrl(): string {
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const baseUrl = this.baseUrl.replace(/^https?:/, wsProtocol);
+    return `${baseUrl}/api/v1/ws/metrics`;
+  }
+
+  /**
+   * Get WebSocket URL for events stream
+   */
+  getEventsStreamUrl(namespace?: string): string {
+    const wsProtocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+    const baseUrl = this.baseUrl.replace(/^https?:/, wsProtocol);
+    let url = `${baseUrl}/api/v1/ws/events`;
+    if (namespace) url += `?namespace=${encodeURIComponent(namespace)}`;
+    return url;
+  }
+}
+
+// -------------------------------------------------------------------------
+// Additional Types
+// -------------------------------------------------------------------------
+
+export interface DeploymentInfo {
+  name: string;
+  namespace: string;
+  replicas: number;
+  available_replicas: number;
+  ready_replicas: number;
+  updated_replicas: number;
+  image: string;
+  strategy: string;
+}
+
+export interface ScaleResponse {
+  success: boolean;
+  namespace: string;
+  deployment: string;
+  previous_replicas: number;
+  current_replicas: number;
+  message?: string;
+}
+
+export interface RestartResponse {
+  success: boolean;
+  namespace: string;
+  deployment: string;
+  message?: string;
+}
+
+export interface WorkflowRun {
+  id: number;
+  name: string;
+  head_branch: string;
+  head_sha: string;
+  status: "queued" | "in_progress" | "completed";
+  conclusion?: "success" | "failure" | "cancelled" | "skipped";
+  html_url: string;
+  created_at: string;
+  updated_at: string;
+  actor: string;
+  event: string;
+  run_number: number;
+}
+
+export interface WorkflowRunsResponse {
+  runs: WorkflowRun[];
+  total_count: number;
+  repository: string;
+}
+
+export interface ArgoApplication {
+  name: string;
+  namespace: string;
+  project: string;
+  repo_url: string;
+  path: string;
+  target_revision: string;
+  sync_status: "Synced" | "OutOfSync" | "Unknown";
+  health_status: "Healthy" | "Progressing" | "Degraded" | "Suspended" | "Missing" | "Unknown";
+  sync_started_at?: string;
+  sync_finished_at?: string;
+  message?: string;
+  resources_synced: number;
+  resources_total: number;
+}
+
+export interface ArgoApplicationsResponse {
+  applications: ArgoApplication[];
+  server: string;
+}
+
+export interface ClusterMetricsResponse {
+  cluster_name: string;
+  timestamp: string;
+  cpu_usage_percent: number;
+  cpu_requests_percent: number;
+  cpu_limits_percent: number;
+  memory_usage_percent: number;
+  memory_requests_percent: number;
+  memory_limits_percent: number;
+  pods_running: number;
+  pods_pending: number;
+  pods_failed: number;
+  network_receive_bytes?: number;
+  network_transmit_bytes?: number;
+}
+
+export interface PrometheusQueryResponse {
+  query: string;
+  result_type: string;
+  series: Array<{
+    metric_name: string;
+    labels: Record<string, string>;
+    data_points: Array<{
+      timestamp: string;
+      value: number;
+    }>;
+  }>;
 }
 
 // Export singleton instance

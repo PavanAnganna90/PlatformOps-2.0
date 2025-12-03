@@ -318,3 +318,184 @@ async def get_pod_metrics(
     """
     service = get_kubernetes_service()
     return service.get_pod_metrics(namespace=namespace, cluster=cluster)
+
+
+# -------------------------------------------------------------------------
+# Deployments
+# -------------------------------------------------------------------------
+
+
+class DeploymentInfo(BaseModel):
+    """Information about a Kubernetes deployment."""
+
+    name: str
+    namespace: str
+    replicas: int
+    available_replicas: int
+    ready_replicas: int
+    updated_replicas: int
+    image: str
+    strategy: str
+
+
+class ScaleRequest(BaseModel):
+    """Request to scale a deployment."""
+
+    replicas: int
+
+
+class ScaleResponse(BaseModel):
+    """Response from scale operation."""
+
+    success: bool
+    namespace: str
+    deployment: str
+    previous_replicas: int
+    current_replicas: int
+    message: Optional[str] = None
+
+
+class RestartResponse(BaseModel):
+    """Response from restart operation."""
+
+    success: bool
+    namespace: str
+    deployment: str
+    message: Optional[str] = None
+
+
+@router.get(
+    "/deployments",
+    response_model=List[DeploymentInfo],
+    summary="List Deployments",
+    description="Returns all deployments in the cluster or namespace.",
+)
+async def list_deployments(
+    namespace: Optional[str] = Query(
+        default=None,
+        description="Filter by namespace",
+    ),
+    cluster: Optional[str] = Query(
+        default=None,
+        description="Cluster name (uses active cluster if not specified)",
+    ),
+) -> List[DeploymentInfo]:
+    """
+    List all deployments.
+
+    Args:
+        namespace: Optional namespace filter
+        cluster: Optional cluster name
+
+    Returns:
+        List of DeploymentInfo objects
+    """
+    service = get_kubernetes_service()
+    return service.list_deployments(namespace=namespace, cluster=cluster)
+
+
+@router.post(
+    "/deployments/{namespace}/{name}/scale",
+    response_model=ScaleResponse,
+    summary="Scale Deployment",
+    description="Scale a deployment to a specified number of replicas.",
+)
+async def scale_deployment(
+    namespace: str,
+    name: str,
+    request: ScaleRequest,
+    cluster: Optional[str] = Query(
+        default=None,
+        description="Cluster name (uses active cluster if not specified)",
+    ),
+) -> ScaleResponse:
+    """
+    Scale a deployment.
+
+    Args:
+        namespace: Deployment namespace
+        name: Deployment name
+        request: Scale request with desired replicas
+        cluster: Optional cluster name
+
+    Returns:
+        ScaleResponse with operation result
+    """
+    service = get_kubernetes_service()
+    return service.scale_deployment(
+        namespace=namespace,
+        name=name,
+        replicas=request.replicas,
+        cluster=cluster,
+    )
+
+
+@router.post(
+    "/deployments/{namespace}/{name}/restart",
+    response_model=RestartResponse,
+    summary="Restart Deployment",
+    description="Restart a deployment by triggering a rolling update.",
+)
+async def restart_deployment(
+    namespace: str,
+    name: str,
+    cluster: Optional[str] = Query(
+        default=None,
+        description="Cluster name (uses active cluster if not specified)",
+    ),
+) -> RestartResponse:
+    """
+    Restart a deployment.
+
+    Triggers a rolling restart by patching the deployment's
+    pod template with a restart annotation.
+
+    Args:
+        namespace: Deployment namespace
+        name: Deployment name
+        cluster: Optional cluster name
+
+    Returns:
+        RestartResponse with operation result
+    """
+    service = get_kubernetes_service()
+    return service.restart_deployment(
+        namespace=namespace,
+        name=name,
+        cluster=cluster,
+    )
+
+
+@router.delete(
+    "/pods/{namespace}/{name}",
+    summary="Delete Pod",
+    description="Delete a pod (useful for forcing a restart).",
+)
+async def delete_pod(
+    namespace: str,
+    name: str,
+    cluster: Optional[str] = Query(
+        default=None,
+        description="Cluster name (uses active cluster if not specified)",
+    ),
+) -> dict:
+    """
+    Delete a pod.
+
+    For pods managed by a deployment/replicaset, a new pod
+    will be automatically created.
+
+    Args:
+        namespace: Pod namespace
+        name: Pod name
+        cluster: Optional cluster name
+
+    Returns:
+        Dict with success status
+    """
+    service = get_kubernetes_service()
+    return service.delete_pod(
+        namespace=namespace,
+        name=name,
+        cluster=cluster,
+    )
