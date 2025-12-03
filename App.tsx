@@ -3,8 +3,10 @@ import { Sidebar } from './components/Sidebar';
 import { GeminiAssistant } from './components/GeminiAssistant';
 import { DashboardView } from './components/views/DashboardView';
 import { InfrastructureView } from './components/views/InfrastructureView';
+import { DeploymentsView } from './components/views/DeploymentsView';
 import { ObservabilityView } from './components/views/ObservabilityView';
 import { CicdView } from './components/views/CicdView';
+import { GitOpsView } from './components/views/GitOpsView';
 import { SecurityView } from './components/views/SecurityView';
 import { TerraformView } from './components/views/TerraformView';
 import { LoginView } from './components/views/LoginView';
@@ -44,8 +46,10 @@ const MainLayout: React.FC = () => {
     switch (activeTab) {
       case 'dashboard': return <DashboardView />;
       case 'infrastructure': return <InfrastructureView />;
+      case 'deployments': return <DeploymentsView />;
       case 'observability': return <ObservabilityView />;
       case 'cicd': return <CicdView />;
+      case 'gitops': return <GitOpsView />;
       case 'security': return <SecurityView />;
       case 'terraform': return <TerraformView />;
       default: return null;

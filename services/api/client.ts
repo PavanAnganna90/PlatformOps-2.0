@@ -398,7 +398,10 @@ class ApiClient {
   /**
    * Delete a pod
    */
-  async deletePod(namespace: string, name: string): Promise<{ success: boolean; message?: string }> {
+  async deletePod(
+    namespace: string,
+    name: string
+  ): Promise<{ success: boolean; message?: string }> {
     return this.request<{ success: boolean; message?: string }>(
       `/api/v1/kubernetes/pods/${namespace}/${name}`,
       { method: "DELETE" }
@@ -435,7 +438,9 @@ class ApiClient {
   /**
    * List ArgoCD applications
    */
-  async listArgoApplications(project?: string): Promise<ArgoApplicationsResponse> {
+  async listArgoApplications(
+    project?: string
+  ): Promise<ArgoApplicationsResponse> {
     const params = project ? `?project=${encodeURIComponent(project)}` : "";
     return this.request<ArgoApplicationsResponse>(
       `/api/v1/integrations/argocd/applications${params}`
@@ -567,7 +572,13 @@ export interface ArgoApplication {
   path: string;
   target_revision: string;
   sync_status: "Synced" | "OutOfSync" | "Unknown";
-  health_status: "Healthy" | "Progressing" | "Degraded" | "Suspended" | "Missing" | "Unknown";
+  health_status:
+    | "Healthy"
+    | "Progressing"
+    | "Degraded"
+    | "Suspended"
+    | "Missing"
+    | "Unknown";
   sync_started_at?: string;
   sync_finished_at?: string;
   message?: string;

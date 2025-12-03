@@ -202,22 +202,22 @@ class ClusterMetricsResponse(BaseModel):
 
     cluster_name: str = Field(description="Cluster name")
     timestamp: datetime = Field(description="Metrics timestamp")
-    
+
     # CPU metrics
     cpu_usage_percent: float = Field(description="Cluster CPU usage percentage")
     cpu_requests_percent: float = Field(description="CPU requests as % of capacity")
     cpu_limits_percent: float = Field(description="CPU limits as % of capacity")
-    
+
     # Memory metrics
     memory_usage_percent: float = Field(description="Cluster memory usage percentage")
     memory_requests_percent: float = Field(description="Memory requests as % of capacity")
     memory_limits_percent: float = Field(description="Memory limits as % of capacity")
-    
+
     # Pod metrics
     pods_running: int = Field(description="Number of running pods")
     pods_pending: int = Field(description="Number of pending pods")
     pods_failed: int = Field(description="Number of failed pods")
-    
+
     # Network metrics (optional)
     network_receive_bytes: Optional[float] = Field(
         default=None, description="Network receive rate (bytes/sec)"
@@ -280,7 +280,4 @@ class DeploymentInfo(BaseModel):
     strategy: str = Field(description="Update strategy (RollingUpdate, Recreate)")
     image: str = Field(description="Container image")
     created_at: datetime = Field(description="Creation timestamp")
-    conditions: Dict[str, bool] = Field(
-        default_factory=dict, description="Deployment conditions"
-    )
-
+    conditions: Dict[str, bool] = Field(default_factory=dict, description="Deployment conditions")
