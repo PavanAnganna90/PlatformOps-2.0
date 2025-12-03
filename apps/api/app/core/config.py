@@ -142,6 +142,24 @@ class Settings(BaseSettings):
     tfc_org: Optional[str] = Field(default=None, alias="TFC_ORG")
 
     # -------------------------------------------------------------------------
+    # Cloud Providers
+    # -------------------------------------------------------------------------
+    # AWS
+    aws_access_key_id: Optional[str] = Field(default=None, alias="AWS_ACCESS_KEY_ID")
+    aws_secret_access_key: Optional[str] = Field(default=None, alias="AWS_SECRET_ACCESS_KEY")
+    aws_region: Optional[str] = Field(default=None, alias="AWS_REGION")
+
+    # GCP
+    gcp_project_id: Optional[str] = Field(default=None, alias="GCP_PROJECT_ID")
+    gcp_credentials_path: Optional[str] = Field(default=None, alias="GCP_CREDENTIALS_PATH")
+
+    # Azure
+    azure_subscription_id: Optional[str] = Field(default=None, alias="AZURE_SUBSCRIPTION_ID")
+    azure_client_id: Optional[str] = Field(default=None, alias="AZURE_CLIENT_ID")
+    azure_client_secret: Optional[str] = Field(default=None, alias="AZURE_CLIENT_SECRET")
+    azure_tenant_id: Optional[str] = Field(default=None, alias="AZURE_TENANT_ID")
+
+    # -------------------------------------------------------------------------
     # Observability
     # -------------------------------------------------------------------------
     otel_endpoint: Optional[str] = Field(default=None, alias="OTEL_EXPORTER_OTLP_ENDPOINT")
@@ -163,6 +181,14 @@ class Settings(BaseSettings):
             "terraform_cloud": bool(self.tfc_token and self.tfc_org),
             "opentelemetry": bool(self.otel_endpoint),
             "loki": bool(self.loki_url),
+            "aws": bool(self.aws_access_key_id and self.aws_secret_access_key),
+            "gcp": bool(self.gcp_project_id),
+            "azure": bool(
+                self.azure_subscription_id
+                and self.azure_client_id
+                and self.azure_client_secret
+                and self.azure_tenant_id
+            ),
         }
 
 

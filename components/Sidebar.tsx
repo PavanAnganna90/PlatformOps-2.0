@@ -1,5 +1,5 @@
 import React from 'react';
-import { LayoutDashboard, Server, Activity, Terminal, Settings, Box, Cloud, Shield, GitBranch, Zap, LogOut, ChevronRight, FolderGit2, Rocket } from 'lucide-react';
+import { LayoutDashboard, Server, Activity, Terminal, Settings, Box, Cloud, Shield, GitBranch, Zap, LogOut, ChevronRight, FolderGit2, Rocket, CloudDrizzle } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 
 interface SidebarProps {
@@ -13,6 +13,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ activeTab, setActiveTab }) => 
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'infrastructure', label: 'Infrastructure', icon: Server },
     { id: 'deployments', label: 'Deployments', icon: Rocket },
+    { id: 'cloud', label: 'Cloud Visibility', icon: CloudDrizzle },
     { id: 'observability', label: 'Observability', icon: Activity },
     { id: 'cicd', label: 'CI/CD Pipelines', icon: GitBranch },
     { id: 'gitops', label: 'GitOps', icon: FolderGit2 },

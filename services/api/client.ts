@@ -477,6 +477,44 @@ class ApiClient {
   }
 
   // -------------------------------------------------------------------------
+  // Cloud Providers
+  // -------------------------------------------------------------------------
+
+  /**
+   * Get cloud resources summary across all providers
+   */
+  async getCloudSummary(): Promise<CloudSummaryResponse> {
+    return this.request<CloudSummaryResponse>("/api/v1/cloud/summary");
+  }
+
+  /**
+   * List resources for a cloud provider
+   */
+  async listCloudResources(
+    provider: "aws" | "gcp" | "azure",
+    options?: { resourceType?: string; region?: string }
+  ): Promise<CloudResourcesResponse> {
+    const params = new URLSearchParams();
+    if (options?.resourceType) params.set("resource_type", options.resourceType);
+    if (options?.region) params.set("region", options.region);
+    const queryString = params.toString();
+    return this.request<CloudResourcesResponse>(
+      `/api/v1/cloud/${provider}/resources${queryString ? `?${queryString}` : ""}`
+    );
+  }
+
+  /**
+   * Get cloud provider status
+   */
+  async getCloudProviderStatus(provider: "aws" | "gcp" | "azure"): Promise<{
+    provider: string;
+    configured: boolean;
+    message: string;
+  }> {
+    return this.request(`/api/v1/cloud/${provider}/status`);
+  }
+
+  // -------------------------------------------------------------------------
   // WebSocket
   // -------------------------------------------------------------------------
 
@@ -618,6 +656,68 @@ export interface PrometheusQueryResponse {
       value: number;
     }>;
   }>;
+}
+
+// -------------------------------------------------------------------------
+// Cloud Provider Types
+// -------------------------------------------------------------------------
+
+export type CloudProvider = "aws" | "gcp" | "azure";
+export type ResourceStatus =
+  | "running"
+  | "stopped"
+  | "terminated"
+  | "pending"
+  | "unknown"
+  | "healthy"
+  | "unhealthy";
+
+export type ResourceType =
+  | "ec2_instance"
+  | "gcp_vm"
+  | "azure_vm"
+  | "lambda"
+  | "cloud_function"
+  | "azure_function"
+  | "s3_bucket"
+  | "gcs_bucket"
+  | "azure_blob"
+  | "rds_instance"
+  | "cloud_sql"
+  | "azure_sql"
+  | "vpc"
+  | "gcp_vpc"
+  | "azure_vnet"
+  | "load_balancer"
+  | "ecs_cluster"
+  | "eks_cluster"
+  | "gke_cluster"
+  | "aks_cluster";
+
+export interface CloudResource {
+  resource_id: string;
+  name: string;
+  provider: CloudProvider;
+  resource_type: ResourceType;
+  status: ResourceStatus;
+  region: string;
+  created_at?: string;
+  tags: Record<string, string>;
+  metadata: Record<string, any>;
+  cost_estimate?: number;
+}
+
+export interface CloudResourcesResponse {
+  provider: CloudProvider;
+  resources: CloudResource[];
+  total_count: number;
+  regions: string[];
+}
+
+export interface CloudSummaryResponse {
+  providers: Record<string, Record<string, number>>;
+  total_resources: number;
+  total_estimated_cost?: number;
 }
 
 // Export singleton instance

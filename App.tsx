@@ -4,6 +4,7 @@ import { GeminiAssistant } from './components/GeminiAssistant';
 import { DashboardView } from './components/views/DashboardView';
 import { InfrastructureView } from './components/views/InfrastructureView';
 import { DeploymentsView } from './components/views/DeploymentsView';
+import { CloudView } from './components/views/CloudView';
 import { ObservabilityView } from './components/views/ObservabilityView';
 import { CicdView } from './components/views/CicdView';
 import { GitOpsView } from './components/views/GitOpsView';
@@ -47,6 +48,7 @@ const MainLayout: React.FC = () => {
       case 'dashboard': return <DashboardView />;
       case 'infrastructure': return <InfrastructureView />;
       case 'deployments': return <DeploymentsView />;
+      case 'cloud': return <CloudView />;
       case 'observability': return <ObservabilityView />;
       case 'cicd': return <CicdView />;
       case 'gitops': return <GitOpsView />;
