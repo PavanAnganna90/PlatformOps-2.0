@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 
 class ClusterStatus(str, Enum):
     """Cluster connection status."""
-    
+
     CONNECTED = "connected"
     DISCONNECTED = "disconnected"
     ERROR = "error"
@@ -18,7 +18,7 @@ class ClusterStatus(str, Enum):
 
 class ResourceStatus(str, Enum):
     """Generic resource status."""
-    
+
     HEALTHY = "healthy"
     WARNING = "warning"
     ERROR = "error"
@@ -28,7 +28,7 @@ class ResourceStatus(str, Enum):
 
 class ClusterInfo(BaseModel):
     """Information about a Kubernetes cluster."""
-    
+
     name: str = Field(description="Cluster name/identifier")
     context: str = Field(description="Kubeconfig context name")
     status: ClusterStatus = Field(description="Connection status")
@@ -38,7 +38,7 @@ class ClusterInfo(BaseModel):
     namespace_count: int = Field(default=0, description="Number of namespaces")
     pod_count: int = Field(default=0, description="Total pod count")
     error: Optional[str] = Field(default=None, description="Error message if disconnected")
-    
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -49,7 +49,7 @@ class ClusterInfo(BaseModel):
                 "version": "1.28",
                 "node_count": 5,
                 "namespace_count": 12,
-                "pod_count": 87
+                "pod_count": 87,
             }
         }
     }
@@ -57,17 +57,14 @@ class ClusterInfo(BaseModel):
 
 class ClusterListResponse(BaseModel):
     """Response containing list of clusters."""
-    
+
     clusters: List[ClusterInfo] = Field(description="List of configured clusters")
-    active_cluster: Optional[str] = Field(
-        default=None,
-        description="Currently active cluster name"
-    )
+    active_cluster: Optional[str] = Field(default=None, description="Currently active cluster name")
 
 
 class NamespaceInfo(BaseModel):
     """Information about a Kubernetes namespace."""
-    
+
     name: str = Field(description="Namespace name")
     status: ResourceStatus = Field(description="Namespace status")
     pod_count: int = Field(default=0, description="Number of pods")
@@ -79,7 +76,7 @@ class NamespaceInfo(BaseModel):
 
 class NodeMetrics(BaseModel):
     """Node resource metrics."""
-    
+
     cpu_usage_percent: float = Field(description="CPU usage percentage")
     cpu_capacity_cores: float = Field(description="Total CPU cores")
     cpu_allocatable_cores: float = Field(description="Allocatable CPU cores")
@@ -92,7 +89,7 @@ class NodeMetrics(BaseModel):
 
 class NodeInfo(BaseModel):
     """Information about a Kubernetes node."""
-    
+
     name: str = Field(description="Node name")
     status: ResourceStatus = Field(description="Node status")
     role: str = Field(default="worker", description="Node role (control-plane/worker)")
@@ -103,8 +100,7 @@ class NodeInfo(BaseModel):
     external_ip: Optional[str] = Field(default=None, description="External IP address")
     metrics: Optional[NodeMetrics] = Field(default=None, description="Resource metrics")
     conditions: Dict[str, bool] = Field(
-        default_factory=dict,
-        description="Node conditions (Ready, MemoryPressure, etc.)"
+        default_factory=dict, description="Node conditions (Ready, MemoryPressure, etc.)"
     )
     labels: Dict[str, str] = Field(default_factory=dict, description="Node labels")
     taints: List[str] = Field(default_factory=list, description="Node taints")
@@ -113,7 +109,7 @@ class NodeInfo(BaseModel):
 
 class PodPhase(str, Enum):
     """Pod phase."""
-    
+
     PENDING = "Pending"
     RUNNING = "Running"
     SUCCEEDED = "Succeeded"
@@ -123,7 +119,7 @@ class PodPhase(str, Enum):
 
 class ContainerStatus(BaseModel):
     """Container status within a pod."""
-    
+
     name: str = Field(description="Container name")
     ready: bool = Field(description="Whether container is ready")
     restart_count: int = Field(default=0, description="Number of restarts")
@@ -133,7 +129,7 @@ class ContainerStatus(BaseModel):
 
 class PodInfo(BaseModel):
     """Information about a Kubernetes pod."""
-    
+
     name: str = Field(description="Pod name")
     namespace: str = Field(description="Namespace")
     phase: PodPhase = Field(description="Pod phase")
@@ -141,13 +137,12 @@ class PodInfo(BaseModel):
     node_name: Optional[str] = Field(default=None, description="Node running the pod")
     pod_ip: Optional[str] = Field(default=None, description="Pod IP address")
     containers: List[ContainerStatus] = Field(
-        default_factory=list,
-        description="Container statuses"
+        default_factory=list, description="Container statuses"
     )
     restart_count: int = Field(default=0, description="Total restart count")
     labels: Dict[str, str] = Field(default_factory=dict, description="Pod labels")
     created_at: Optional[datetime] = Field(default=None, description="Creation timestamp")
-    
+
     model_config = {
         "json_schema_extra": {
             "example": {
@@ -163,13 +158,12 @@ class PodInfo(BaseModel):
                         "ready": True,
                         "restart_count": 0,
                         "state": "running",
-                        "image": "nginx:1.25"
+                        "image": "nginx:1.25",
                     }
                 ],
                 "restart_count": 0,
                 "labels": {"app": "nginx"},
-                "created_at": "2024-01-15T10:30:00Z"
+                "created_at": "2024-01-15T10:30:00Z",
             }
         }
     }
-

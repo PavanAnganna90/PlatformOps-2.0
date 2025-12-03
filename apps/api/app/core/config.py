@@ -18,14 +18,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 def find_dotenv() -> Optional[Path]:
     """
     Find .env file by walking up from current directory.
-    
+
     Searches in order:
     1. Current working directory
     2. Parent directories up to project root
     3. apps/api directory
     """
     current = Path.cwd()
-    
+
     # Check current and parent directories
     for parent in [current] + list(current.parents):
         env_file = parent / ".env"
@@ -34,68 +34,70 @@ def find_dotenv() -> Optional[Path]:
         # Stop at git root
         if (parent / ".git").exists():
             break
-    
+
     return None
 
 
 class Settings(BaseSettings):
     """
     Application settings loaded from environment variables.
-    
+
     All settings can be overridden via environment variables.
     For local development, create a .env file in the project root.
     """
-    
+
     model_config = SettingsConfigDict(
         env_file=find_dotenv(),
         env_file_encoding="utf-8",
         case_sensitive=False,
         extra="ignore",  # Ignore extra env vars (like VITE_*)
     )
-    
+
     # -------------------------------------------------------------------------
     # Application Settings
     # -------------------------------------------------------------------------
     app_name: str = Field(default="OpsSight API", description="Application name")
     app_version: str = Field(default="1.0.0", description="Application version")
     debug: bool = Field(default=False, alias="API_DEBUG", description="Enable debug mode")
-    
+
     # -------------------------------------------------------------------------
     # Server Settings
     # -------------------------------------------------------------------------
     host: str = Field(default="0.0.0.0", alias="API_HOST")
     port: int = Field(default=8000, alias="API_PORT")
-    
+
     # CORS origins (comma-separated string or list)
     cors_origins: str = Field(
-        default="http://localhost:5173,http://localhost:3000",
+        default="http://localhost:5173,http://localhost:5174,http://localhost:3000",
         alias="API_CORS_ORIGINS",
     )
-    
+
     @property
     def cors_origins_list(self) -> List[str]:
         """Parse CORS origins into a list."""
         if not self.cors_origins:
             return []
         return [origin.strip() for origin in self.cors_origins.split(",")]
-    
+
     # -------------------------------------------------------------------------
     # Database
     # -------------------------------------------------------------------------
     database_url: Optional[str] = Field(default=None, alias="DATABASE_URL")
-    
+
     # -------------------------------------------------------------------------
     # Supabase
     # -------------------------------------------------------------------------
     supabase_url: Optional[str] = Field(default=None, alias="VITE_SUPABASE_URL")
     supabase_anon_key: Optional[str] = Field(default=None, alias="VITE_SUPABASE_ANON_KEY")
-    supabase_service_role_key: Optional[str] = Field(default=None, alias="SUPABASE_SERVICE_ROLE_KEY")
-    
+    supabase_service_role_key: Optional[str] = Field(
+        default=None, alias="SUPABASE_SERVICE_ROLE_KEY"
+    )
+
     @property
     def is_supabase_configured(self) -> bool:
         """Check if Supabase is configured."""
         return bool(self.supabase_url and self.supabase_anon_key)
-    
+
     # -------------------------------------------------------------------------
     # Security
     # -------------------------------------------------------------------------
@@ -105,29 +107,29 @@ class Settings(BaseSettings):
     )
     jwt_algorithm: str = Field(default="HS256")
     jwt_expiration_hours: int = Field(default=24)
-    
+
     encryption_key: str = Field(
         default_factory=lambda: secrets.token_urlsafe(32),
         alias="ENCRYPTION_KEY",
     )
-    
+
     # -------------------------------------------------------------------------
     # Kubernetes
     # -------------------------------------------------------------------------
     kubeconfig_default: Optional[str] = Field(default=None, alias="KUBECONFIG_DEFAULT")
-    
+
     @property
     def kubeconfig_path(self) -> Optional[Path]:
         """Get the kubeconfig path, defaulting to ~/.kube/config."""
         if self.kubeconfig_default:
             return Path(self.kubeconfig_default)
-        
+
         default_path = Path.home() / ".kube" / "config"
         if default_path.exists():
             return default_path
-        
+
         return None
-    
+
     # -------------------------------------------------------------------------
     # Integrations
     # -------------------------------------------------------------------------
@@ -138,17 +140,17 @@ class Settings(BaseSettings):
     github_org: Optional[str] = Field(default=None, alias="GITHUB_ORG")
     tfc_token: Optional[str] = Field(default=None, alias="TFC_TOKEN")
     tfc_org: Optional[str] = Field(default=None, alias="TFC_ORG")
-    
+
     # -------------------------------------------------------------------------
     # Observability
     # -------------------------------------------------------------------------
     otel_endpoint: Optional[str] = Field(default=None, alias="OTEL_EXPORTER_OTLP_ENDPOINT")
     loki_url: Optional[str] = Field(default=None, alias="LOKI_URL")
-    
+
     def get_integration_status(self) -> dict:
         """
         Get the configuration status of all integrations.
-        
+
         Returns:
             dict: Status of each integration (configured/not configured)
         """
@@ -168,11 +170,10 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """
     Get cached application settings.
-    
+
     Uses LRU cache to avoid re-reading environment on every call.
-    
+
     Returns:
         Settings: Application settings instance
     """
     return Settings()
-
